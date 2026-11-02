@@ -106,7 +106,8 @@ def comprehension_plan(scenes: list[dict[str, Any]], allowed: dict[str, list[str
 
 def build_design(config: dict[str, Any], properties: list[dict[str, Any]],
                  scenes: list[dict[str, Any]], checked: dict | None = None,
-                 questionnaires: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+                 questionnaires: list[dict[str, Any]] | None = None,
+                 previews: set[str] | None = None) -> dict[str, Any]:
     """Build the design document the participant app loads."""
     if len(properties) < 2:
         raise ValueError("at least two screened-in properties are needed")
@@ -129,6 +130,8 @@ def build_design(config: dict[str, Any], properties: list[dict[str, Any]],
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "properties": [
             {key: p[key] for key in ("id", "element", "name", "description", "low", "high")}
+            | ({"variants": list(p["render"]["variants"])} if "variants" in p.get("render", {}) else {})
+            | ({"preview": f"previews/{p['id']}.mp4"} if p["id"] in (previews or ()) else {})
             for p in properties
         ],
         "scenes": [{"id": s["id"], "name": s["name"], "country": s.get("country", ""),

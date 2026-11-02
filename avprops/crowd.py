@@ -101,7 +101,7 @@ def rows_to_records(rows: list[dict], attention_max_wrong: int) -> list[dict[str
             elif task == "ab":
                 record["ab"].append({key: t.get(key) for key in (
                     "index", "property", "scene", "a_level", "b_level", "noticed", "preferred_option",
-                    "preferred_level", "importance", "ratings")}
+                    "preferred_level", "importance", "ratings", "high_variant")}
                     | {"repeat": bool(t.get("repeat")), "rt_ms": _rt(t), "hidden": bool(t.get("hidden"))})
             elif task == "questionnaire":
                 # survey-likert stores the index of the chosen label; store 1..n
@@ -109,7 +109,7 @@ def rows_to_records(rows: list[dict], attention_max_wrong: int) -> list[dict[str
                     {item: int(index) + 1 for item, index in response.items()})
             elif task == "comprehension":
                 record["comprehension"].append({key: t.get(key) for key in (
-                    "scene", "property", "level", "answer", "correct")}
+                    "scene", "property", "level", "high_variant", "answer", "correct")}
                     | {"rt_ms": _rt(t), "hidden": bool(t.get("hidden"))})
             elif task == "attention":
                 attention.append(bool(t.get("correct")))

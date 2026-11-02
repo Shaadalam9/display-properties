@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import subprocess
 from pathlib import Path
 
 import cv2
@@ -33,14 +34,24 @@ def baseline_style(config: dict) -> Style:
     return Style.from_overrides(Style(), overrides)
 
 
+def high_levels(prop: dict) -> dict[str, dict]:
+    """File-name suffix -> overrides of a property's high level(s): "high", or one
+    "high_<variant>" per variant (e.g. the palettes)."""
+    render = prop["render"]
+    if "variants" in render:
+        return {f"high_{name}": overrides for name, overrides in render["variants"].items()}
+    return {"high": render["high"]}
+
+
 def variants(properties: list[dict], base: Style) -> list[tuple[str, Style]]:
-    """(file name, style) for the baseline and both levels of every property."""
+    """(file name, style) for the baseline and every level of every property."""
     out: list[tuple[str, Style]] = [("baseline", base)]
     for prop in properties:
         if "render" not in prop:
             raise SystemExit(f"{prop['id']} has no render block, so it cannot be made as a clip; screen it out")
-        for level in ("low", "high"):
-            out.append((f"{prop['id']}_{level}", Style.from_overrides(base, prop["render"][level])))
+        out.append((f"{prop['id']}_low", Style.from_overrides(base, prop["render"]["low"])))
+        for suffix, overrides in high_levels(prop).items():
+            out.append((f"{prop['id']}_{suffix}", Style.from_overrides(base, overrides)))
     return out
 
 
@@ -116,16 +127,62 @@ def check(scene: dict, geometry, styles: list[tuple[str, Style]], step_s: float 
     by_name = dict(styles)
     results = []
     for name in [n[:-4] for n, _ in styles if n.endswith("_low")]:
-        low, high = by_name[name + "_low"], by_name[name + "_high"]
-        vis_low, vis_high = renderer.visibility(low), renderer.visibility(high)
-        changed = []
-        for i in indices:
-            a = renderer.render_frame(frames[i], i, low, float(vis_low[i]))
-            b = renderer.render_frame(frames[i], i, high, float(vis_high[i]))
-            changed.append(float((np.abs(a.astype(int) - b.astype(int)).max(axis=2) > 12).mean()))
-        share = float(np.mean(changed))
+        low = by_name[name + "_low"]
+        highs = [s for n, s in styles if n == name + "_high" or n.startswith(name + "_high_")]
+        vis_low = renderer.visibility(low)
+        base_frames = {i: renderer.render_frame(frames[i], i, low, float(vis_low[i])) for i in indices}
+        shares = []
+        for high in highs:  # a property with variants must differ from its low level in every one
+            vis_high = renderer.visibility(high)
+            changed = []
+            for i in indices:
+                b = renderer.render_frame(frames[i], i, high, float(vis_high[i]))
+                changed.append(float((np.abs(base_frames[i].astype(int) - b.astype(int)).max(axis=2) > 12).mean()))
+            shares.append(float(np.mean(changed)))
+        share = min(shares)
         results.append((name, share, share >= min_changed))
     return results
+
+
+PREVIEW_DIR = PROJECT_ROOT / "public" / "stimuli" / "previews"
+
+
+def build_previews(properties: list[dict], checked: dict) -> list[str]:
+    """A 5 s looping example per property for the ranking screens: its low and high clip
+    side by side (2 x 2 for a property with three variants), from the scene where the pair
+    differs most. Uses the rendered clips, so run it after rendering."""
+    PREVIEW_DIR.mkdir(parents=True, exist_ok=True)
+    made = []
+    for prop in properties:
+        scored = [(v[prop["id"]]["changed"], scene) for scene, v in checked.items()
+                  if v.get(prop["id"], {}).get("ok")]
+        if not scored:
+            print(f"{prop['id']}: no scene where it visibly differs; no preview")
+            continue
+        scene = max(scored)[1]
+        files = [f"{prop['id']}_low"] + [f"{prop['id']}_{suffix}" for suffix in high_levels(prop)]
+        paths = [PROJECT_ROOT / "public" / "stimuli" / scene / f"{f}.mp4" for f in files]
+        if not all(p.exists() for p in paths):
+            print(f"{prop['id']}: clips of {scene} not rendered yet; no preview")
+            continue
+        # timing properties differ before the event (overlay off vs on); the rest at it
+        start = 1.0 if any(k in prop["render"]["low"] or k in next(iter(high_levels(prop).values()))
+                           for k in TIMING_KEYS) else 5.0
+        inputs = []
+        for path in paths:
+            inputs += ["-ss", f"{start}", "-t", "5", "-i", str(path)]
+        scaled = "".join(f"[{i}:v]scale=480:270[v{i}];" for i in range(len(paths)))
+        if len(paths) == 2:
+            layout = "[v0][v1]hstack=inputs=2[out]"
+        else:
+            layout = "".join(f"[v{i}]" for i in range(4)) + "xstack=inputs=4:layout=0_0|w0_0|0_h0|w0_h0[out]"
+        out = PREVIEW_DIR / f"{prop['id']}.mp4"
+        subprocess.run(["ffmpeg", "-v", "error", "-y", *inputs, "-filter_complex", scaled + layout, "-map", "[out]",
+                        "-c:v", "libx264", "-crf", "28", "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-an",
+                        str(out)], check=True)
+        made.append(prop["id"])
+        print(f"{prop['id']}: preview from {scene}")
+    return made
 
 
 def main() -> None:
@@ -135,6 +192,8 @@ def main() -> None:
     parser.add_argument("--reserves", action="store_true", help="also the screened-out properties that can be rendered")
     parser.add_argument("--preview", action="store_true", help="contact sheet of stills instead of videos")
     parser.add_argument("--calibrate", action="store_true", help="camera calibration image per scene")
+    parser.add_argument("--previews", action="store_true",
+                        help="build the ranking screens' example videos from the rendered clips")
     parser.add_argument("--check", action="store_true",
                         help="report how much each pair differs in each scene, without rendering videos")
     args = parser.parse_args()
@@ -152,6 +211,9 @@ def main() -> None:
 
     check_path = PROJECT_ROOT / "data" / "stimulus_check.json"
     checked = json.loads(check_path.read_text()) if check_path.exists() else {}
+    if args.previews:
+        build_previews(props, checked)
+        return
     for scene in scenes:
         geometry = geometry_for(scene)
         previews = PROJECT_ROOT / "data" / "previews"
@@ -164,7 +226,8 @@ def main() -> None:
             results = check(scene, geometry, styles)
             for name, share, ok in results:
                 print(f"  {'ok  ' if ok else 'WEAK'} {name:<22} {share:7.2%}")
-            checked[scene["id"]] = {name: {"changed": round(share, 5), "ok": ok} for name, share, ok in results}
+            checked.setdefault(scene["id"], {}).update(  # a run for some properties keeps the others
+                {name: {"changed": round(share, 5), "ok": ok} for name, share, ok in results})
             check_path.parent.mkdir(parents=True, exist_ok=True)
             check_path.write_text(json.dumps(checked, indent=1))
             continue

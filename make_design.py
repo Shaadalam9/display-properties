@@ -21,8 +21,9 @@ def required_clips(design: dict) -> list[str]:
         for scene in design["scenes"]:
             clips += [f"stimuli/{scene['id']}/baseline.mp4", f"stimuli/{scene['id']}/none.mp4"]
     for prop in design["properties"]:
+        highs = [f"high_{v}" for v in prop["variants"]] if prop.get("variants") else ["high"]
         for scene in design["ab"]["scenes"][prop["id"]]:
-            for level in ("low", "high"):
+            for level in ["low", *highs]:
                 clips.append(f"stimuli/{scene}/{prop['id']}_{level}.mp4")
     return clips
 
@@ -33,7 +34,9 @@ def main() -> None:
     check_path = PROJECT_ROOT / "data" / "stimulus_check.json"
     checked = json.loads(check_path.read_text()) if check_path.exists() else None
     scenes = [s for s in load_scenes(config) if s.get("clip")] if checked else load_scenes(config)
-    design = build_design(config, properties, scenes, checked, load_questionnaires(config))
+    preview_dir = resolve(config["design_output"]).parent / "stimuli" / "previews"
+    previews = {f.stem for f in preview_dir.glob("*.mp4")} if preview_dir.exists() else set()
+    design = build_design(config, properties, scenes, checked, load_questionnaires(config), previews)
 
     out = resolve(config["design_output"])
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -49,6 +52,7 @@ def main() -> None:
     print(f"  Comprehension questions: {len(design['comprehension'])} "
           f"({', '.join(c['scene'] for c in design['comprehension'])})")
     print(f"  Questionnaires: {', '.join(q['id'] for q in design['questionnaires']) or 'none'}")
+    print(f"  Ranking previews: {sum('preview' in p for p in design['properties'])} of {len(design['properties'])}")
     print("  " + ("Scenes per property from data/stimulus_check.json" if checked
                   else "No stimulus check yet: every scene allowed for every property"))
     for prop, allowed in design["ab"]["scenes"].items():

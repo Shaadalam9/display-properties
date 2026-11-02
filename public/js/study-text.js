@@ -22,7 +22,8 @@ var STUDY_TEXT = {
         '<h1>Part 1: what matters most</h1>' +
         '<p>Next you will see groups of display properties.</p>' +
         '<p>In each group, choose the property that is <strong>most</strong> important for you to understand what ' +
-        'the car is doing and why, and the one that is <strong>least</strong> important.</p>',
+        'the car is doing and why, and the one that is <strong>least</strong> important.</p>' +
+        '<p>Each property has a short example video: the left side shows one end of it, the right side the other.</p>',
     abIntro:
         '<h1>Part 2: comparing videos</h1>' +
         '<p>Next you will see pairs of videos, A and B, of the same situation.</p>' +

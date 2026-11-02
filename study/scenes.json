@@ -1,5 +1,5 @@
 {
- "_comment": "Driving situations used as stimuli. clip: source dashcam video (not in git). start_s/duration_s: the part of it used. event_s: when the car reacts, in source-clip seconds; the display is shown around it. why/how/manoeuvre: the explanation texts. camera: flat-ground constants for this clip at 1280x720 (check them with render_stimuli.py --calibrate). geometry: overlay geometry for the clip; empty = data/geometry/<id>_geometry.jsonl.gz, written by extract_geometry.py. comprehension: the clip stops at stop_s (source-clip seconds) and the participant answers what the car does next; correct must match what the footage shows after stop_s. verified: whether a person checked the answer against the footage. country: ISO 3166 code of where the clip was filmed (compared with participants' country of residence). criticality: low or high, how risky the situation is; the analysis compares preferences between the two.",
+ "_comment": "Driving situations used as stimuli. clip: source dashcam video (not in git). start_s/duration_s: the part of it used. event_s: when the car reacts, in source-clip seconds; the display is shown around it. why/how/manoeuvre: the explanation texts. geometry: overlay geometry for the clip, from the perception pipeline (data/geometry_pipeline/, which also holds the camera calibration it found); empty = data/geometry/<id>_geometry.jsonl.gz, written by extract_geometry.py. camera: flat-ground constants at 1280x720, given only where the pipeline's auto-calibration found none; they then win over the geometry's (check them with render_stimuli.py --calibrate). comprehension: the clip stops at stop_s (source-clip seconds) and the participant answers what the car does next; correct must match what the footage shows after stop_s. verified: whether a person checked the answer against the footage. country: ISO 3166 code of where the clip was filmed (compared with participants' country of residence). criticality: low or high, how risky the situation is; the analysis compares preferences between the two. source: the dataset video and its start in it. texts_verified: whether a person checked the why/how/manoeuvre texts against the footage (the how part is a guess from still frames until then).",
  "scenes": [
   {
    "id": "pedestrian_crossing",
@@ -15,13 +15,7 @@
    "how": "Waiting",
    "manoeuvre": "Waiting at crossing",
    "speed_kmh": 0,
-   "camera": {
-    "horizon_v": 448.0,
-    "vanish_u": 636.0,
-    "focal_px": 1000.0,
-    "cam_height_m": 1.3
-   },
-   "geometry": "",
+   "geometry": "data/geometry_pipeline/TuCsyBF3nHU_4630_30s_0_geometry.jsonl.gz",
    "comprehension": {
     "stop_s": 8.0,
     "question": "What will the car do next?",
@@ -49,13 +43,7 @@
    "why": "Slow traffic ahead",
    "how": "Slowing down",
    "manoeuvre": "Keeping lane",
-   "camera": {
-    "horizon_v": 455.0,
-    "vanish_u": 640.0,
-    "focal_px": 1000.0,
-    "cam_height_m": 1.3
-   },
-   "geometry": "",
+   "geometry": "data/geometry_pipeline/Esyp2P0uJu4_276_30s_0_geometry.jsonl.gz",
    "comprehension": {
     "stop_s": 17.0,
     "question": "What will the car do next?",
@@ -83,13 +71,7 @@
    "why": "Pedestrian on the road",
    "how": "Slowing down",
    "manoeuvre": "Keeping lane",
-   "camera": {
-    "horizon_v": 455.0,
-    "vanish_u": 640.0,
-    "focal_px": 1000.0,
-    "cam_height_m": 1.3
-   },
-   "geometry": "",
+   "geometry": "data/geometry_pipeline/Esyp2P0uJu4_276_30s_0_geometry.jsonl.gz",
    "comprehension": {
     "stop_s": 6.0,
     "question": "What will the car do next?",
@@ -126,6 +108,392 @@
    "geometry": "",
    "country": "",
    "criticality": "low"
+  },
+  {
+   "id": "rotterdam_calm",
+   "name": "Suburban road, Rotterdam",
+   "clip": "data/clips/m9M4MYI_tAY_978_30s.mp4",
+   "start_s": 4.0,
+   "duration_s": 14.0,
+   "event_s": [
+    10.0,
+    15.0
+   ],
+   "why": "Clear road ahead",
+   "how": "Keeping lane",
+   "manoeuvre": "Keeping lane",
+   "texts_verified": false,
+   "geometry": "data/geometry_pipeline/m9M4MYI_tAY_978_30s_0_geometry.jsonl.gz",
+   "country": "NL",
+   "criticality": "low",
+   "source": {
+    "video": "m9M4MYI_tAY",
+    "start_s": 978.0,
+    "city": "Rotterdam"
+   }
+  },
+  {
+   "id": "rotterdam_risky",
+   "name": "Truck ahead at a crossing, Rotterdam",
+   "clip": "data/clips/m9M4MYI_tAY_2543_30s.mp4",
+   "start_s": 4.0,
+   "duration_s": 14.0,
+   "event_s": [
+    10.0,
+    15.0
+   ],
+   "why": "Truck ahead at a crossing",
+   "how": "Keeping distance",
+   "manoeuvre": "Keeping lane",
+   "texts_verified": false,
+   "geometry": "data/geometry_pipeline/m9M4MYI_tAY_2543_30s_0_geometry.jsonl.gz",
+   "country": "NL",
+   "criticality": "high",
+   "source": {
+    "video": "m9M4MYI_tAY",
+    "start_s": 2543.0,
+    "city": "Rotterdam"
+   }
+  },
+  {
+   "id": "valencia_calm",
+   "name": "Empty avenue, Valencia",
+   "clip": "data/clips/G7wQRZ3nopk_2414_30s.mp4",
+   "start_s": 4.0,
+   "duration_s": 14.0,
+   "event_s": [
+    10.0,
+    15.0
+   ],
+   "why": "Clear road ahead",
+   "how": "Keeping lane",
+   "manoeuvre": "Keeping lane",
+   "texts_verified": false,
+   "geometry": "data/geometry_pipeline/G7wQRZ3nopk_2414_30s_0_geometry.jsonl.gz",
+   "country": "ES",
+   "criticality": "low",
+   "source": {
+    "video": "G7wQRZ3nopk",
+    "start_s": 2414.0,
+    "city": "Valencia"
+   }
+  },
+  {
+   "id": "valencia_risky",
+   "name": "Pedestrians on a zebra crossing, Valencia",
+   "clip": "data/clips/G7wQRZ3nopk_2655_30s.mp4",
+   "start_s": 4.0,
+   "duration_s": 14.0,
+   "event_s": [
+    10.0,
+    15.0
+   ],
+   "why": "Pedestrians crossing",
+   "how": "Waiting",
+   "manoeuvre": "Waiting at crossing",
+   "texts_verified": false,
+   "geometry": "data/geometry_pipeline/G7wQRZ3nopk_2655_30s_0_geometry.jsonl.gz",
+   "country": "ES",
+   "criticality": "high",
+   "source": {
+    "video": "G7wQRZ3nopk",
+    "start_s": 2655.0,
+    "city": "Valencia"
+   }
+  },
+  {
+   "id": "chicago_calm",
+   "name": "Empty intersection, Chicago",
+   "clip": "data/clips/XzwI2rGmf04_712_30s.mp4",
+   "start_s": 4.0,
+   "duration_s": 14.0,
+   "event_s": [
+    10.0,
+    15.0
+   ],
+   "why": "Red light",
+   "how": "Waiting",
+   "manoeuvre": "Waiting at red light",
+   "texts_verified": false,
+   "camera": {
+    "horizon_v": 530.0,
+    "vanish_u": 640.0,
+    "focal_px": 1000.0,
+    "cam_height_m": 1.3
+   },
+   "geometry": "data/geometry_pipeline/XzwI2rGmf04_712_30s_0_geometry.jsonl.gz",
+   "country": "US",
+   "criticality": "low",
+   "source": {
+    "video": "XzwI2rGmf04",
+    "start_s": 712.0,
+    "city": "Chicago"
+   }
+  },
+  {
+   "id": "chicago_risky",
+   "name": "Pedestrian crossing, Chicago",
+   "clip": "data/clips/XzwI2rGmf04_3555_30s.mp4",
+   "start_s": 4.0,
+   "duration_s": 14.0,
+   "event_s": [
+    10.0,
+    15.0
+   ],
+   "why": "Pedestrian crossing",
+   "how": "Waiting",
+   "manoeuvre": "Waiting at crossing",
+   "texts_verified": false,
+   "geometry": "data/geometry_pipeline/XzwI2rGmf04_3555_30s_0_geometry.jsonl.gz",
+   "country": "US",
+   "criticality": "high",
+   "source": {
+    "video": "XzwI2rGmf04",
+    "start_s": 3555.0,
+    "city": "Chicago"
+   }
+  },
+  {
+   "id": "mexico_city_calm",
+   "name": "Urban expressway, Mexico City",
+   "clip": "data/clips/MpA3FHZ3yZc_2370_30s.mp4",
+   "start_s": 4.0,
+   "duration_s": 14.0,
+   "event_s": [
+    10.0,
+    15.0
+   ],
+   "why": "Clear road ahead",
+   "how": "Keeping lane",
+   "manoeuvre": "Keeping lane",
+   "texts_verified": false,
+   "geometry": "data/geometry_pipeline/MpA3FHZ3yZc_2370_30s_0_geometry.jsonl.gz",
+   "country": "MX",
+   "criticality": "low",
+   "source": {
+    "video": "MpA3FHZ3yZc",
+    "start_s": 2370.0,
+    "city": "Mexico City"
+   }
+  },
+  {
+   "id": "mexico_city_risky",
+   "name": "Pedestrian crossing in traffic, Mexico City",
+   "clip": "data/clips/MpA3FHZ3yZc_160_30s.mp4",
+   "start_s": 4.0,
+   "duration_s": 14.0,
+   "event_s": [
+    10.0,
+    15.0
+   ],
+   "why": "Pedestrian crossing",
+   "how": "Waiting",
+   "manoeuvre": "Waiting at crossing",
+   "texts_verified": false,
+   "camera": {
+    "horizon_v": 460.0,
+    "vanish_u": 640.0,
+    "focal_px": 1000.0,
+    "cam_height_m": 1.3
+   },
+   "geometry": "data/geometry_pipeline/MpA3FHZ3yZc_160_30s_0_geometry.jsonl.gz",
+   "country": "MX",
+   "criticality": "high",
+   "source": {
+    "video": "MpA3FHZ3yZc",
+    "start_s": 160.0,
+    "city": "Mexico City"
+   }
+  },
+  {
+   "id": "jaipur_calm",
+   "name": "Open road, Jaipur",
+   "clip": "data/clips/jwZV8i60Sbs_850_30s.mp4",
+   "start_s": 4.0,
+   "duration_s": 14.0,
+   "event_s": [
+    10.0,
+    15.0
+   ],
+   "why": "Clear road ahead",
+   "how": "Keeping lane",
+   "manoeuvre": "Keeping lane",
+   "texts_verified": false,
+   "geometry": "data/geometry_pipeline/jwZV8i60Sbs_850_30s_0_geometry.jsonl.gz",
+   "country": "IN",
+   "criticality": "low",
+   "source": {
+    "video": "jwZV8i60Sbs",
+    "start_s": 850.0,
+    "city": "Jaipur"
+   }
+  },
+  {
+   "id": "jaipur_risky",
+   "name": "Rickshaws and pedestrians, Jaipur",
+   "clip": "data/clips/jwZV8i60Sbs_90_30s.mp4",
+   "start_s": 4.0,
+   "duration_s": 14.0,
+   "event_s": [
+    10.0,
+    15.0
+   ],
+   "why": "Rickshaws and pedestrians close",
+   "how": "Driving slowly",
+   "manoeuvre": "Keeping lane",
+   "texts_verified": false,
+   "geometry": "data/geometry_pipeline/jwZV8i60Sbs_90_30s_0_geometry.jsonl.gz",
+   "country": "IN",
+   "criticality": "high",
+   "source": {
+    "video": "jwZV8i60Sbs",
+    "start_s": 90.5,
+    "city": "Jaipur"
+   }
+  },
+  {
+   "id": "hanoi_calm",
+   "name": "Arterial road, Hanoi",
+   "clip": "data/clips/AKaJkDqrOjU_364_30s.mp4",
+   "start_s": 4.0,
+   "duration_s": 14.0,
+   "event_s": [
+    10.0,
+    15.0
+   ],
+   "why": "Light traffic ahead",
+   "how": "Keeping lane",
+   "manoeuvre": "Keeping lane",
+   "texts_verified": false,
+   "geometry": "data/geometry_pipeline/AKaJkDqrOjU_364_30s_0_geometry.jsonl.gz",
+   "country": "VN",
+   "criticality": "low",
+   "source": {
+    "video": "AKaJkDqrOjU",
+    "start_s": 364.0,
+    "city": "Hanoi"
+   }
+  },
+  {
+   "id": "hanoi_risky",
+   "name": "Dense motorbike traffic, Hanoi",
+   "clip": "data/clips/AKaJkDqrOjU_493_30s.mp4",
+   "start_s": 4.0,
+   "duration_s": 14.0,
+   "event_s": [
+    10.0,
+    15.0
+   ],
+   "why": "Motorbikes all around",
+   "how": "Driving slowly",
+   "manoeuvre": "Keeping lane",
+   "texts_verified": false,
+   "geometry": "data/geometry_pipeline/AKaJkDqrOjU_493_30s_0_geometry.jsonl.gz",
+   "country": "VN",
+   "criticality": "high",
+   "source": {
+    "video": "AKaJkDqrOjU",
+    "start_s": 493.0,
+    "city": "Hanoi"
+   }
+  },
+  {
+   "id": "kobe_calm",
+   "name": "City road under an expressway, Kobe",
+   "clip": "data/clips/TJjqYeYyIoE_632_30s.mp4",
+   "start_s": 4.0,
+   "duration_s": 14.0,
+   "event_s": [
+    10.0,
+    15.0
+   ],
+   "why": "Clear road ahead",
+   "how": "Keeping lane",
+   "manoeuvre": "Keeping lane",
+   "texts_verified": false,
+   "geometry": "data/geometry_pipeline/TJjqYeYyIoE_632_30s_0_geometry.jsonl.gz",
+   "country": "JP",
+   "criticality": "low",
+   "source": {
+    "video": "TJjqYeYyIoE",
+    "start_s": 632.0,
+    "city": "Kobe"
+   }
+  },
+  {
+   "id": "kobe_risky",
+   "name": "Shopping street with pedestrians, Kobe",
+   "clip": "data/clips/TJjqYeYyIoE_1452_30s.mp4",
+   "start_s": 4.0,
+   "duration_s": 14.0,
+   "event_s": [
+    10.0,
+    15.0
+   ],
+   "why": "Pedestrians on the street",
+   "how": "Driving slowly",
+   "manoeuvre": "Keeping lane",
+   "texts_verified": false,
+   "geometry": "data/geometry_pipeline/TJjqYeYyIoE_1452_30s_0_geometry.jsonl.gz",
+   "country": "JP",
+   "criticality": "high",
+   "source": {
+    "video": "TJjqYeYyIoE",
+    "start_s": 1452.0,
+    "city": "Kobe"
+   }
+  },
+  {
+   "id": "sydney_calm",
+   "name": "City motorway, Sydney",
+   "clip": "data/clips/wMu6Va5PhGY_242_30s.mp4",
+   "start_s": 4.0,
+   "duration_s": 14.0,
+   "event_s": [
+    10.0,
+    15.0
+   ],
+   "why": "Clear road ahead",
+   "how": "Keeping lane",
+   "manoeuvre": "Keeping lane",
+   "texts_verified": false,
+   "geometry": "data/geometry_pipeline/wMu6Va5PhGY_242_30s_0_geometry.jsonl.gz",
+   "country": "AU",
+   "criticality": "low",
+   "source": {
+    "video": "wMu6Va5PhGY",
+    "start_s": 242.0,
+    "city": "Sydney"
+   }
+  },
+  {
+   "id": "sydney_risky",
+   "name": "Traffic and pedestrians crossing, Sydney",
+   "clip": "data/clips/wMu6Va5PhGY_1902_30s.mp4",
+   "start_s": 4.0,
+   "duration_s": 14.0,
+   "event_s": [
+    10.0,
+    15.0
+   ],
+   "why": "Traffic crossing ahead",
+   "how": "Waiting",
+   "manoeuvre": "Waiting at crossing",
+   "texts_verified": false,
+   "camera": {
+    "horizon_v": 520.0,
+    "vanish_u": 640.0,
+    "focal_px": 1000.0,
+    "cam_height_m": 1.3
+   },
+   "geometry": "data/geometry_pipeline/wMu6Va5PhGY_1902_30s_0_geometry.jsonl.gz",
+   "country": "AU",
+   "criticality": "high",
+   "source": {
+    "video": "wMu6Va5PhGY",
+    "start_s": 1902.5,
+    "city": "Sydney"
+   }
   }
  ]
 }

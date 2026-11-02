@@ -30,6 +30,8 @@ from avprops.clip_render import Camera, encode_h264
 PERSON_CLASSES = {0: "person", 1: "bicycle", 3: "motorcycle"}
 VEHICLE_CLASSES = {2: "car", 5: "bus", 7: "truck"}
 SIZE = (1280, 720)  # geometry is made at this size; the camera constants refer to it
+# used for a scene without its own constants (one whose calibration came with pipeline geometry)
+DEFAULT_CAMERA = {"horizon_v": 448.0, "vanish_u": 636.0, "focal_px": 1000.0, "cam_height_m": 1.3}
 
 
 def _path_centre(camera: Camera, offset_m: float, curve: float) -> list[list[float]]:
@@ -45,7 +47,7 @@ def extract(scene: dict[str, Any], clip: Path, out_dir: Path, model_name: str = 
             device: str | None = None, corridor_m: float = 3.5, reach_m: float = 35.0) -> Path:
     from ultralytics import YOLO  # heavy; only needed here
 
-    camera_constants = scene["camera"]
+    camera_constants = scene.get("camera") or DEFAULT_CAMERA
     camera = Camera({"camera": camera_constants})
     cap = cv2.VideoCapture(str(clip))
     fps = cap.get(cv2.CAP_PROP_FPS) or 30.0

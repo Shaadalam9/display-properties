@@ -31,7 +31,9 @@ data in the `entries` collection of a MongoDB database. jsPsych and its plugins 
 7. **Task C**: a baseline video of the display, then the open question "What would you want this display to show, or
    show differently?", asked before any property is named.
 8. **Task A**: Best-Worst Scaling (jsPsych MaxDiff). Each trial shows 4 properties; the participant picks the most and
-   least important for understanding what the car is doing and why. With the 15 screened-in properties that is 12 trials.
+   least important for understanding what the car is doing and why. Each property comes with a short looping preview
+   of its levels side by side (`public/stimuli/previews/`), so it is judged from what it looks like and not only from
+   its name. With the 17 screened-in properties that is 13 trials.
 9. **Task B**: A/B video pairs. For each of 10 properties, the same situation with the property at its low and high
    level (side randomised): did you notice a difference, which would you prefer while riding, how much does it matter
    (1–7), and for each video understanding, perceived safety and mental load (1–7). Mixed in: one pair of the display
@@ -46,10 +48,16 @@ version, the scene per property and the side of each level are seeded with the w
 
 ### Stimuli
 `study/properties.json` lists the candidate properties from the literature review
-(`reports/AV display property literature.md`): the 15 screened in, 4 reserves, and the ones fixed or excluded with the
-reason. `study/scenes.json` lists the driving situations. Every scene needs, under `public/stimuli/<scene id>/`:
-`baseline.mp4`, and `<property id>_low.mp4` plus `<property id>_high.mp4` for every screened-in property. The two
-clips of a pair must differ in that one property only.
+(`reports/AV display property literature.md`): the 17 screened in, 3 reserves, and the ones fixed or excluded with the
+reason. The screened-in set includes the four parameters of the follow-up preference study (highlight strength
+`mask_alpha`, path opacity `trajectory_alpha`, background dimming `background_dim_alpha` and colour palette
+`palette_id`), with the same ranges and defaults, so that study's choice of parameters can be checked against what
+participants rank here. `study/scenes.json` lists the driving situations. Every scene needs, under `public/stimuli/<scene id>/`:
+`baseline.mp4`, `none.mp4` (the clip without a display), and `<property id>_low.mp4` plus `<property id>_high.mp4` for
+every screened-in property. A property with more than two levels lists `variants` and has one
+`<property id>_high_<variant>.mp4` per variant (the palette: the standard palette against the Okabe-Ito, minimalist
+and high-saliency palettes); each participant sees one variant, at random. The two clips of a pair must differ in that
+one property only.
 
 Each scene records the `country` it was filmed in (ISO code) and its `criticality` (low or high risk), so the
 analysis can compare preferences between risky and calm situations, and between clips from a participant's own
@@ -63,9 +71,14 @@ The clips are made, not filmed: a real dashcam clip with the explanation display
 and high clip of every renderable property actually differ on screen.
 
 The renderer draws from per-frame overlay geometry: the planned path, the road users with outlines, boxes, distances
-and track ids, an occlusion map and the explanation ramp (format documented in `avprops/clip_render.py`).
-`extract_geometry.py` makes that geometry for a clip with YOLO segmentation and ByteTrack; its planned path is a
-straight path in the car's lane, so a turn needs geometry from a lane-following pipeline or a hand-set `path_curve`.
+and track ids, an occlusion map and the explanation ramp (format documented in `avprops/clip_render.py`). The scenes
+use geometry from a full perception pipeline (`data/geometry_pipeline/`): YOLO26x segmentation with ByteTrack,
+SegFormer road segmentation, Depth Anything V2 distances, a camera auto-calibration per clip, and a planned path
+anchored to the road from visual odometry of the car's actual motion. Each scene's `geometry` names its file; a
+`camera` in the scene is only given where the auto-calibration found none, and then wins over the geometry's.
+Geometry made from footage above 1280 px wide is scaled down on reading, so every stimulus is 1280×720.
+`extract_geometry.py` is a simpler fallback with YOLO segmentation and ByteTrack and a straight path in the car's
+lane.
 
 ```bash
 uv sync --extra extract                                  # detection and tracking dependencies
@@ -75,6 +88,8 @@ uv run python render_stimuli.py --preview                # a still of every clip
 uv run python render_stimuli.py --check                  # how much each pair differs in each scene
 uv run python make_design.py                             # uses the check to pick scenes per property
 uv run python render_stimuli.py                          # the clips, as H.264, into public/stimuli/
+uv run python render_stimuli.py --previews               # the BWS previews, from the rendered clips
+uv run python make_design.py                             # again, so the design lists the previews
 ```
 
 A property can only differ in a scene that has what it acts on: other road users' paths need people moving sideways,
@@ -85,11 +100,29 @@ only the scenes where it passed, and stops with an error if a property passes in
 pairs with nothing to show, not proof that people notice the difference; the "did you notice" answers in the pilot do
 that.
 
-The planned path of `extract_geometry.py` is straight, and it predicts only sideways movement of other road users,
-because the camera car's own speed cannot be recovered from a dashcam clip. Choose clips accordingly, or use
-geometry from a lane-following pipeline where the path must follow a turn.
+Because the pipeline's path covers only where the car actually drives, it is short or absent while the car stands
+still, so the path properties pass the check mostly in scenes where the car moves. The highlight properties act on
+pedestrians (the road users the car reacts to) and so pass mostly in the risky scenes. Both limit how far the calm vs
+risky comparison can be read for those properties; `make_design.py` prints the scenes each property may use. Other
+road users' paths show only sideways movement, because the camera car's own speed is not subtracted.
 
-Source clips go in `data/clips/` and, like the rendered stimuli, are not in git. `make_design.py` lists the clips the
+Source clips go in `data/clips/` and, like the rendered stimuli, are not in git.
+
+**Finding scenes.** The scenes come from long dashcam drives in many cities (the CROWD dataset), one calm and one
+risky stretch per city. `scan_videos.py` proposes them:
+
+```bash
+uv run --extra extract python scan_videos.py VIDEOS... --segments segments.csv --device cuda:0
+```
+
+It decodes each video at 2 frames per second, detects road users with YOLO and scores every 14 s window by how
+close and central the road users ahead are (pedestrians, cyclists and motorcyclists weigh 1.5 times as much),
+leaving out windows with a cut, dark windows (dusk, night) and, with `--segments`, anything outside the stretches the
+dataset's mapping lists as car driving in the locality. It writes the calmest (with some traffic) and riskiest
+windows of each video with a strip of frames to review. The score is a screen, not a measure of danger: big trucks
+close ahead score high even in a queue, and a video's label can be wrong (one "car" video turned out to be a
+walking tour), so every scene is chosen by eye. Scenes record their `source` video and start, `country` and
+`criticality`, and `texts_verified` stays false until someone has checked the explanation texts against the clip. `make_design.py` lists the clips the
 design needs that are still missing.
 
 After any change to the properties, scenes or settings, regenerate the design:

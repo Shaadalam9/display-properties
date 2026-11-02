@@ -35,17 +35,28 @@ import cv2
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
+def _hex(code: str) -> tuple[int, int, int]:
+    return tuple(int(code[i:i + 2], 16) for i in (1, 3, 5))
+
+
+# The four palettes of the preference study this one feeds (palette_id 0-3), with their
+# colours as RGB: "target" fills, outlines and marks road users, "trajectory" draws the
+# path, "highlight" is the accent (here: the second road-user class when class_colours is
+# on), "label_text"/"label_background" the text panels. "far" is where the path's
+# uncertainty gradient ends; the palettes define none, so it is a red-ish tone per palette.
 PALETTES = {
-    # RGB. "path" and "highlight" are the two accents; "vehicle" is the second class
-    # colour when class colours are on; "far" is where the uncertainty gradient ends.
-    "automotive": {"path": (90, 200, 245), "highlight": (255, 220, 0), "vehicle": (80, 140, 255),
-                   "far": (255, 70, 120), "text": (255, 255, 255), "panel": (0, 0, 0)},
-    "muted": {"path": (150, 185, 200), "highlight": (210, 210, 210), "vehicle": (150, 170, 210),
-              "far": (210, 140, 150), "text": (240, 240, 240), "panel": (30, 30, 30)},
-    "high_saliency": {"path": (204, 255, 0), "highlight": (255, 0, 85), "vehicle": (0, 200, 255),
-                      "far": (255, 0, 0), "text": (255, 255, 255), "panel": (0, 0, 0)},
-    "accessible": {"path": (0, 158, 115), "highlight": (230, 159, 0), "vehicle": (86, 180, 233),
-                   "far": (213, 94, 0), "text": (17, 17, 17), "panel": (240, 228, 66)},
+    0: {"name": "automotive_standard", "target": _hex("#FFDC00"), "trajectory": _hex("#5AC8F5"),
+        "highlight": _hex("#FFA000"), "label_text": _hex("#FFFFFF"), "label_background": _hex("#000000"),
+        "far": _hex("#FF4678")},
+    1: {"name": "accessibility_okabe_ito", "target": _hex("#56B4E9"), "trajectory": _hex("#009E73"),
+        "highlight": _hex("#E69F00"), "label_text": _hex("#111111"), "label_background": _hex("#F0E442"),
+        "far": _hex("#D55E00")},
+    2: {"name": "minimalist_hud", "target": _hex("#E0E0E0"), "trajectory": _hex("#48CAE4"),
+        "highlight": _hex("#90E0EF"), "label_text": _hex("#FFFFFF"), "label_background": _hex("#222222"),
+        "far": _hex("#FF6B6B")},
+    3: {"name": "high_saliency", "target": _hex("#FF0055"), "trajectory": _hex("#CCFF00"),
+        "highlight": _hex("#FF0055"), "label_text": _hex("#FFFFFF"), "label_background": _hex("#000000"),
+        "far": _hex("#FF0000")},
 }
 
 HIGHLIGHT_STYLES = ("outline", "fill", "box")
@@ -54,21 +65,24 @@ SCOPES = ("relevant", "all")
 
 @dataclass(frozen=True)
 class Style:
-    """Every renderable parameter. Defaults are the neutral baseline of the study; where
-    the literature gives one, it is the expert mean in Jansen et al. (CHI 2025)."""
+    """Every renderable parameter. Defaults are the neutral baseline of the study.
+    trajectory_alpha, mask_alpha, background_dim_alpha and palette_id have the ranges and
+    defaults of the preference study's parameter space; the other defaults come from the
+    literature review (e.g. marker size: the expert mean in Jansen et al., CHI 2025)."""
 
     # planned path
-    path_opacity: float = 0.71              # 0 = no path
+    trajectory_alpha: float = 0.55          # path opacity, 0-1; 0 = no path
     path_half_width_m: float = 0.6          # half of the band's width on the road
     path_length_m: float = 20.0             # how far ahead the path is drawn
     path_chevrons: bool = False             # direction arrows on the band
     path_motion: bool = False               # arrows flow forward
     path_uncertainty: float = 0.0           # 0 = one hue; 1 = full gradient to "far" with distance
-    chevron_spacing_m: float = 3.0
+    chevron_spacing_m: float = 4.0
+    chevron_length_m: float = 1.6
     chevron_speed_mps: float = 5.0
     manoeuvre_cue: bool = False             # icon + text for the next manoeuvre
     # road users
-    highlight_opacity: float = 0.23
+    mask_alpha: float = 0.14                # road-user mask opacity, 0-0.7
     highlight_style: str = "fill"           # outline | fill | box
     highlight_scope: str = "relevant"       # relevant | all
     class_colours: bool = False             # pedestrians and vehicles in different hues
@@ -85,8 +99,8 @@ class Style:
     lead_time_s: float = 0.0                # overlay appears this much before the ramp
     fade_s: float = 0.5                     # 0 = instant on/off
     # appearance (fixed in the study, kept as parameters)
-    background_dim: float = 0.0
-    palette: str = "automotive"
+    background_dim_alpha: float = 0.06      # darkening of the rest of the scene, 0-0.4
+    palette_id: int = 0                     # PALETTES key, 0-3
     contrast: float = 0.0                   # dark halo behind elements
     text_scale: float = 1.0
 
@@ -100,8 +114,11 @@ class Style:
         return style
 
     def validate(self) -> None:
-        if self.palette not in PALETTES:
-            raise ValueError(f"unknown palette {self.palette!r}")
+        if self.palette_id not in PALETTES:
+            raise ValueError(f"unknown palette_id {self.palette_id!r}")
+        for name, top in (("trajectory_alpha", 1.0), ("mask_alpha", 0.7), ("background_dim_alpha", 0.4)):
+            if not 0.0 <= getattr(self, name) <= top:
+                raise ValueError(f"{name} must be within 0-{top}")
         if self.highlight_style not in HIGHLIGHT_STYLES:
             raise ValueError(f"highlight_style must be one of {HIGHLIGHT_STYLES}")
         if self.highlight_scope not in SCOPES:
@@ -134,7 +151,28 @@ class Geometry:
         return int(self.header["width"]), int(self.header["height"])
 
 
-def read_geometry(path: Path) -> Geometry:
+def _scale_geometry(header: dict[str, Any], frames: list[dict[str, Any]], factor: float) -> None:
+    """Scale every pixel coordinate in place (distances in metres stay as they are)."""
+    header["width"] = int(round(header["width"] * factor / 2) * 2)
+    header["height"] = int(round(header["height"] * factor / 2) * 2)
+    for key in ("horizon_v", "vanish_u", "focal_px"):
+        header["camera"][key] *= factor
+    for frame in frames:
+        ribbon = frame.get("ribbon") or {}
+        if ribbon.get("centre"):
+            ribbon["centre"] = (np.asarray(ribbon["centre"], float) * factor).tolist()
+        for key in ("near_v", "far_v"):
+            if ribbon.get(key) is not None:
+                ribbon[key] *= factor
+        for d in frame.get("persons", []) + frame.get("vehicles", []):
+            d["box"] = [v * factor for v in d["box"]]
+            if d.get("poly"):
+                d["poly"] = (np.asarray(d["poly"], float) * factor).tolist()
+
+
+def read_geometry(path: Path, max_width: int = 1280) -> Geometry:
+    """Read a geometry dump. One made at a larger size (e.g. from 4K footage) is scaled
+    down to max_width, so every stimulus is rendered at the same size."""
     opener = gzip.open if path.suffix == ".gz" else open
     header, frames = None, []
     with opener(path, "rt", encoding="utf-8") as fh:
@@ -148,6 +186,8 @@ def read_geometry(path: Path) -> Geometry:
     if header is None or not frames:
         raise ValueError(f"{path}: no header or no frames (an interrupted extraction?)")
     frames.sort(key=lambda r: r["i"])
+    if max_width and int(header["width"]) > max_width:
+        _scale_geometry(header, frames, max_width / int(header["width"]))
     occlusion_path = None
     if header.get("occlusion_video"):
         named = Path(header["occlusion_video"])
@@ -261,8 +301,10 @@ class ClipRenderer:
 
     def __init__(self, geometry: Geometry, scene: dict[str, Any] | None = None):
         self.geometry = geometry
-        self.camera = Camera(geometry.header)
         self.scene = scene or {}
+        # the scene's camera wins over the one stored with the geometry, so a calibration
+        # can be corrected in scenes.json without extracting the geometry again
+        self.camera = Camera({"camera": self.scene["camera"]} if self.scene.get("camera") else geometry.header)
         self.width, self.height = geometry.size
         self.fps = geometry.fps
         self._speed = self._speed_track()
@@ -319,6 +361,24 @@ class ClipRenderer:
                   for d in frame.get("others") or []]
         return persons + vehicles + others
 
+    def _pedestrians(self, frame: dict) -> list[dict]:
+        """People on foot: detected persons that are not riding a bicycle or motorcycle (a
+        rider's box sits on top of the two-wheeler's box)."""
+        everyone = self._everyone(frame)
+        # two-wheeler class names of both geometry sources ("bike"/"moto" or COCO's names)
+        wheels = [d["box"] for d in everyone if d.get("cls") in ("bicycle", "motorcycle", "bike", "moto")]
+
+        def riding(box) -> bool:
+            x0, y0, x1, y1 = box
+            for wx0, wy0, wx1, wy1 in wheels:
+                overlap = max(0, min(x1, wx1) - max(x0, wx0))
+                if overlap > 0.5 * (x1 - x0) and y1 > wy0 and y1 < wy1 + 0.25 * (wy1 - wy0):
+                    return True
+            return False
+
+        return [d for d in everyone if d["kind"] == "person" and d.get("cls", "person") == "person"
+                and not riding(d["box"])]
+
     def _shown(self, frame: dict, style: Style) -> list[dict]:
         return self._relevant(frame) if style.highlight_scope == "relevant" else self._everyone(frame)
 
@@ -347,7 +407,7 @@ class ClipRenderer:
     # --- layers
 
     def _draw_path(self, ov: Overlay, frame: dict, style: Style, pal: dict, index: int, occlusion) -> None:
-        if style.path_opacity <= 0:
+        if style.trajectory_alpha <= 0:
             return
         ground = path_on_ground(self.camera, frame.get("ribbon"), style.path_length_m)
         if ground is None:
@@ -366,10 +426,10 @@ class ClipRenderer:
             rows = np.arange(self.height, dtype=np.float32)
             near_v, far_v = left[0, 1], left[-1, 1]
             t = np.clip((near_v - rows) / max(near_v - far_v, 1.0), 0, 1) * style.path_uncertainty
-            colour = (np.outer(1 - t, pal["path"]) + np.outer(t, pal["far"]))[:, None, :]
-            ov.paint(band, np.broadcast_to(colour, (self.height, self.width, 3)), style.path_opacity)
+            colour = (np.outer(1 - t, pal["trajectory"]) + np.outer(t, pal["far"]))[:, None, :]
+            ov.paint(band, np.broadcast_to(colour, (self.height, self.width, 3)), style.trajectory_alpha)
         else:
-            ov.paint(band, pal["path"], style.path_opacity)
+            ov.paint(band, pal["trajectory"], style.trajectory_alpha)
 
         if style.path_chevrons:
             phase = 0.0
@@ -377,22 +437,22 @@ class ClipRenderer:
                 phase = float((frame.get("ribbon") or {}).get("phase_m", 0.0)) + index / self.fps * style.chevron_speed_mps
             arc = _arc(ground)
             marks = []
-            for s in np.arange(style.chevron_spacing_m - phase % style.chevron_spacing_m, arc[-1] - 0.8,
+            for s in np.arange(style.chevron_spacing_m - phase % style.chevron_spacing_m, arc[-1] - style.chevron_length_m,
                                style.chevron_spacing_m):
                 at = lambda a, col: np.interp(a, arc, col)  # noqa: E731
-                tip = np.array([at(s + 0.8, ground[:, 0]), at(s + 0.8, ground[:, 1])])
+                tip = np.array([at(s + style.chevron_length_m, ground[:, 0]), at(s + style.chevron_length_m, ground[:, 1])])
                 base = np.array([at(s, ground[:, 0]), at(s, ground[:, 1])])
                 side = np.array([at(s, normal[:, 0]), at(s, normal[:, 1])])
-                w = style.path_half_width_m * 0.8
+                w = style.path_half_width_m * 0.9
                 pts = np.array([base - side * w, tip, base + side * w, base + (tip - base) * 0.45])
                 marks.append(self.camera.to_image(pts).round().astype(np.int32))
             if marks:
                 chev = _mask(shape, lambda m: cv2.fillPoly(m, marks, 255, cv2.LINE_AA))
                 chev = _occlude(chev, occlusion)
-                ov.paint(chev, (255, 255, 255), min(1.0, style.path_opacity + 0.2))
+                ov.paint(chev, (255, 255, 255), min(1.0, style.trajectory_alpha + 0.2))
 
     def _colour_for(self, det: dict, style: Style, pal: dict):
-        return pal["vehicle"] if style.class_colours and det["kind"] == "vehicle" else pal["highlight"]
+        return pal["highlight"] if style.class_colours and det["kind"] == "vehicle" else pal["target"]
 
     def _draw_highlights(self, ov: Overlay, frame: dict, style: Style, pal: dict) -> list[dict]:
         shape = (self.height, self.width)
@@ -404,27 +464,26 @@ class ClipRenderer:
             poly = np.asarray(det.get("poly") or [], dtype=float)
             has_poly = poly.ndim == 2 and poly.shape[1:] == (2,) and len(poly) >= 3
             pts = poly.round().astype(np.int32) if has_poly else np.array([[x0, y0], [x1, y0], [x1, y1], [x0, y1]], np.int32)
-            if style.highlight_opacity > 0:
+            if style.mask_alpha > 0:
                 if style.highlight_style == "fill":
                     m = _mask(shape, lambda m: cv2.fillPoly(m, [pts], 255, cv2.LINE_AA))
-                    opacity = style.highlight_opacity
+                    opacity = style.mask_alpha
                 elif style.highlight_style == "outline":
                     m = _mask(shape, lambda m: cv2.polylines(m, [pts], True, 255, thick, cv2.LINE_AA))
-                    opacity = min(1.0, style.highlight_opacity * 2)
+                    opacity = min(1.0, style.mask_alpha * 2)
                 else:
                     m = _mask(shape, lambda m: cv2.rectangle(m, (x0, y0), (x1, y1), 255, thick, cv2.LINE_AA))
-                    opacity = min(1.0, style.highlight_opacity * 2)
+                    opacity = min(1.0, style.mask_alpha * 2)
                 ov.paint(_halo(m, style.contrast), (0, 0, 0), 0.6 * style.contrast)
                 ov.paint(m, colour, opacity)
         if style.marker_size > 0:
-            # markers go on every detected pedestrian, whichever road users are highlighted
-            for det in self._everyone(frame):
-                if det["kind"] != "person":
-                    continue
+            # markers go on every pedestrian, whichever road users are highlighted
+            for det in self._pedestrians(frame):
                 x0, y0, x1, y1 = (int(v) for v in det["box"])
-                # marker_size uses the 0.1-0.2 scale of Jansen et al. (2025), read as the marker's radius
-                # in metres, so it shrinks with distance like a real object
-                px_per_m = self.camera.focal / float(det["dist"]) if det.get("dist") else (y1 - y0) / 1.7
+                # marker_size is read as the marker's radius in metres, so it shrinks with
+                # distance like a real object; closer than 5 m it stops growing
+                px_per_m = (self.camera.focal / max(5.0, float(det["dist"])) if det.get("dist")
+                            else (y1 - y0) / 1.7)
                 r = max(2, int(round(style.marker_size * px_per_m)))
                 centre = ((x0 + x1) // 2, y0 - r - 4)
                 m = _mask(shape, lambda m: cv2.circle(m, centre, r, 255, -1, cv2.LINE_AA))
@@ -466,7 +525,7 @@ class ClipRenderer:
         for det in self._shown(frame, style):
             x0, y0, x1, y1 = (int(v) for v in det["box"])
             cv2.rectangle(keep, (x0 - 6, y0 - 6), (x1 + 6, y1 + 6), 255, -1)
-        ground = path_on_ground(self.camera, frame.get("ribbon"), style.path_length_m) if style.path_opacity > 0 else None
+        ground = path_on_ground(self.camera, frame.get("ribbon"), style.path_length_m) if style.trajectory_alpha > 0 else None
         if ground is not None:
             n = _normals(ground)
             w = style.path_half_width_m + 0.5
@@ -485,8 +544,8 @@ class ClipRenderer:
             box = draw.textbbox(xy, text, font=font, anchor=anchor)
             pad = int(size * 0.4)
             draw.rounded_rectangle((box[0] - pad, box[1] - pad, box[2] + pad, box[3] + pad), radius=pad,
-                                   fill=pal["panel"] + (int(round(panel_alpha * strength)),))
-            draw.text(xy, text, font=font, fill=pal["text"] + (a,), anchor=anchor)
+                                   fill=pal["label_background"] + (int(round(panel_alpha * strength)),))
+            draw.text(xy, text, font=font, fill=pal["label_text"] + (a,), anchor=anchor)
             return box
 
         if style.distance_labels:
@@ -520,10 +579,10 @@ class ClipRenderer:
                 draw.regular_polygon((cx, cy, s), 8, rotation=22.5, fill=(220, 40, 40, a))
             elif d == 0:
                 draw.polygon([(cx, cy - s), (cx + s * .7, cy), (cx + s * .25, cy), (cx + s * .25, cy + s),
-                              (cx - s * .25, cy + s), (cx - s * .25, cy), (cx - s * .7, cy)], fill=pal["path"] + (a,))
+                              (cx - s * .25, cy + s), (cx - s * .25, cy), (cx - s * .7, cy)], fill=pal["trajectory"] + (a,))
             else:
                 draw.polygon([(cx + d * s, cy), (cx, cy - s * .7), (cx, cy - s * .25), (cx - d * s, cy - s * .25),
-                              (cx - d * s, cy + s * .25), (cx, cy + s * .25), (cx, cy + s * .7)], fill=pal["path"] + (a,))
+                              (cx - d * s, cy + s * .25), (cx, cy + s * .25), (cx, cy + s * .7)], fill=pal["trajectory"] + (a,))
 
         if style.status_opacity > 0:
             speed = self._speed[index] if index < len(self._speed) else np.nan
@@ -541,7 +600,7 @@ class ClipRenderer:
                 w, h = 180 * unit, 14 * unit
                 boxed((x1, y1 - h - 10 * unit), "Confidence", 18 * unit, "rd")
                 draw.rounded_rectangle((x1 - w, y1 - h, x1, y1), radius=h / 2, fill=(255, 255, 255, int(a * 0.35)))
-                colour = pal["path"] if c >= 0.6 else pal["far"]
+                colour = pal["trajectory"] if c >= 0.6 else pal["far"]
                 draw.rounded_rectangle((x1 - w, y1 - h, x1 - w + max(h, w * c), y1), radius=h / 2, fill=colour + (a,))
 
     # --- frame
@@ -551,10 +610,10 @@ class ClipRenderer:
         if strength <= 0:
             return image_bgr
         frame = self.geometry.frames[index]
-        pal = PALETTES[style.palette]
+        pal = PALETTES[style.palette_id]
         out = image_bgr.astype(np.float32)
-        if style.background_dim > 0:
-            out *= 1 - (self._dim_mask(frame, style) * style.background_dim * strength)[..., None]
+        if style.background_dim_alpha > 0:
+            out *= 1 - (self._dim_mask(frame, style) * style.background_dim_alpha * strength)[..., None]
         ov = Overlay(self.width, self.height)
         self._draw_path(ov, frame, style, pal, index, occlusion)
         shown = self._draw_highlights(ov, frame, style, pal)

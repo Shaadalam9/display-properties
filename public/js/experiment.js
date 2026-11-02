@@ -152,6 +152,14 @@ function buildTimeline(design) {
 
     var props = {};
     design.properties.forEach(function(p) { props[p.id] = p; });
+    // a property with variants (the palettes) has several high levels: draw one per use
+    var pickVariant = function(prop) {
+        var v = props[prop] && props[prop].variants;
+        return v ? v[Math.floor(Math.random() * v.length)] : null;
+    };
+    var levelFile = function(prop, level, variant) {
+        return prop + '_' + level + (level === 'high' && variant ? '_' + variant : '');
+    };
 
     // --- per-participant assignment
     var bws_version = Math.floor(Math.random() * design.bws.versions.length);
@@ -165,7 +173,8 @@ function buildTimeline(design) {
             var allowed = design.ab.scenes[prop];
             var a_level = Math.random() < 0.5 ? 'low' : 'high';
             return { property: prop, scene: allowed[(i + scene_offset) % allowed.length],
-                     a_level: a_level, b_level: a_level === 'low' ? 'high' : 'low' };
+                     a_level: a_level, b_level: a_level === 'low' ? 'high' : 'low',
+                     high_variant: pickVariant(prop) };
         });
     // display vs no display: one extra pair, at a random place among the others
     if (design.ab.no_display) {
@@ -178,14 +187,16 @@ function buildTimeline(design) {
     var repeat_plan = jsPsych.randomization.shuffle(ab_plan.filter(function(p) { return p.property !== 'no_display'; }))
         .slice(0, design.ab.repeats)
         .map(function(p) {
-            return { property: p.property, scene: p.scene, a_level: p.b_level, b_level: p.a_level, repeat: true };
+            return { property: p.property, scene: p.scene, a_level: p.b_level, b_level: p.a_level,
+                     high_variant: p.high_variant, repeat: true };
         });
     var pair_plan = ab_plan.concat(repeat_plan);
 
     // stimulus_url (config): stimuli/ when the server has the clips, or the URL where they are hosted
     var clip = function(scene, name) { return design.stimulus_url + scene + '/' + name + '.mp4'; };
     var pairClip = function(plan, level) {
-        return plan.property === 'no_display' ? clip(plan.scene, level) : clip(plan.scene, plan.property + '_' + level);
+        return plan.property === 'no_display' ? clip(plan.scene, level)
+            : clip(plan.scene, levelFile(plan.property, level, plan.high_variant));
     };
     var baseline_clip = clip(design.baseline_scene, 'baseline');
 
@@ -194,7 +205,7 @@ function buildTimeline(design) {
     var comprehension_plan = design.comprehension.map(function(c) {
         var prop = c.properties[Math.floor(Math.random() * c.properties.length)];
         return { scene: c.scene, property: prop, level: Math.random() < 0.5 ? 'low' : 'high', spec: c,
-                 options: jsPsych.randomization.shuffle(c.options) };
+                 high_variant: pickVariant(prop), options: jsPsych.randomization.shuffle(c.options) };
     });
 
     var timeline = [];
@@ -202,7 +213,8 @@ function buildTimeline(design) {
     // --- preload, full screen, device check
     var videos = [baseline_clip];
     ab_plan.forEach(function(p) { videos.push(pairClip(p, p.a_level), pairClip(p, p.b_level)); });
-    comprehension_plan.forEach(function(c) { videos.push(clip(c.scene, c.property + '_' + c.level)); });
+    comprehension_plan.forEach(function(c) { videos.push(clip(c.scene, levelFile(c.property, c.level, c.high_variant))); });
+    design.properties.forEach(function(p) { if (p.preview) videos.push(design.stimulus_url + p.preview); });
     timeline.push({
         type: jsPsychPreload,
         video: videos,
@@ -234,7 +246,7 @@ function buildTimeline(design) {
         show_clickable_nav: true,
         data: { task: 'instructions', bws_version: bws_version, ab_plan: pair_plan,
                 comprehension_plan: comprehension_plan.map(function(c) {
-                    return { scene: c.scene, property: c.property, level: c.level };
+                    return { scene: c.scene, property: c.property, level: c.level, high_variant: c.high_variant };
                 }),
                 window_width_init: window.innerWidth, window_height_init: window.innerHeight }
     });
@@ -317,13 +329,14 @@ function buildTimeline(design) {
     comprehension_plan.forEach(function(c, k) {
         timeline.push({
             type: jsPsychVideoButtonResponse,
-            stimulus: [clip(c.scene, c.property + '_' + c.level)],
+            stimulus: [clip(c.scene, levelFile(c.property, c.level, c.high_variant))],
             prompt: '<p><strong>' + c.spec.question + '</strong></p>',
             choices: c.options,
             stop: c.spec.stop_s,
             response_allowed_while_playing: debug,
             width: 960,
             data: { task: 'comprehension', index: k, scene: c.scene, property: c.property, level: c.level,
+                    high_variant: c.high_variant,
                     options: c.options, expected: c.spec.correct },
             on_load: flagMissingVideos,
             on_finish: function(data) {
@@ -359,8 +372,12 @@ function buildTimeline(design) {
     var bws_blocks = bws_trials.map(function(items, t) {
         var alternatives = items.map(function(id) {
             var p = props[id];
-            return '<div class="alt"><strong>' + p.name + '</strong><br>' + p.description +
-                '<br><span class="levels">' + p.low + ' &hellip; ' + p.high + '</span></div>';
+            // a short looping example of the property (render_stimuli.py --previews): low on the
+            // left, high on the right (the palettes: all four)
+            var preview = p.preview ? '<video class="preview" src="' + design.stimulus_url + p.preview +
+                '" autoplay muted loop playsinline></video>' : '';
+            return '<div class="alt">' + preview + '<div><strong>' + p.name + '</strong><br>' + p.description +
+                '<br><span class="levels">' + p.low + ' &hellip; ' + p.high + '</span></div></div>';
         });
         return {
             type: jsPsychMaxdiff,
@@ -404,7 +421,7 @@ function buildTimeline(design) {
             html: html,
             button_label: 'Continue',
             data: { task: 'ab', index: i, property: plan.property, scene: plan.scene, a_level: plan.a_level,
-                    b_level: plan.b_level, repeat: !!plan.repeat },
+                    b_level: plan.b_level, high_variant: plan.high_variant, repeat: !!plan.repeat },
             on_load: flagMissingVideos,
             on_finish: function(data) {
                 var r = data.response;

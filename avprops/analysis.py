@@ -229,10 +229,24 @@ def _group_of(factor: str, rec: dict, pair: dict, scenes: dict[str, dict]) -> st
         if not home or not scene.get("country"):
             return None
         return "own country" if home == scene["country"] else "other country"
+    if factor == "variant":
+        return pair.get("high_variant") or None
     if factor == "colour_vision":
         answer = (rec.get("demographics") or {}).get("colour_vision_deficiency")
         return {"Yes": "deficiency", "No": "typical"}.get(answer)
     raise ValueError(factor)
+
+
+def _group_test(table: list[list[int]]) -> float:
+    """Fisher's exact test for two groups, chi-square for more (e.g. palette variants)."""
+    if len(table) < 2 or any(sum(row) == 0 for row in table):
+        return np.nan
+    if len(table) == 2:
+        return float(stats.fisher_exact(table).pvalue)
+    columns = np.array(table).sum(axis=0)
+    if (columns == 0).any():
+        return np.nan
+    return float(stats.chi2_contingency(table).pvalue)
 
 
 def subgroup_summary(records: list[dict], properties: list[dict], scenes: list[dict]) -> pd.DataFrame:
@@ -241,7 +255,8 @@ def subgroup_summary(records: list[dict], properties: list[dict], scenes: list[d
     scene_meta = {s["id"]: s for s in scenes}
     rows = []
     for prop in properties:
-        factors = ["criticality", "familiarity"] + (["colour_vision"] if prop.get("colour_dependent") else [])
+        factors = (["criticality", "familiarity"] + (["colour_vision"] if prop.get("colour_dependent") else [])
+                   + (["variant"] if "variants" in prop.get("render", {}) else []))
         for factor in factors:
             groups: dict[str, list[dict]] = {}
             for rec in records:
@@ -261,12 +276,10 @@ def subgroup_summary(records: list[dict], properties: list[dict], scenes: list[d
                              "pref_n": len(noticed),
                              "prefer_high_share": high / len(noticed) if noticed else np.nan})
             p_pref = p_seen = np.nan
-            if len(stats_by_group) == 2:
-                (n1, h1), (n2, h2) = stats_by_group.values()
-                if n1 > 0 and n2 > 0:
-                    p_pref = float(stats.fisher_exact([[h1, n1 - h1], [h2, n2 - h2]]).pvalue)
-                (t1, s1), (t2, s2) = seen_by_group.values()
-                p_seen = float(stats.fisher_exact([[s1, t1 - s1], [s2, t2 - s2]]).pvalue)
+            pref_table = [[h, n - h] for n, h in stats_by_group.values() if n > 0]
+            seen_table = [[s_, t - s_] for t, s_ in seen_by_group.values()]
+            p_pref = _group_test(pref_table)
+            p_seen = _group_test(seen_table)
             for row in rows[len(rows) - len(stats_by_group):]:
                 row["p_noticed_differs"] = p_seen
                 row["p_prefer_high_differs"] = p_pref

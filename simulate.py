@@ -51,6 +51,7 @@ def simulate(design: dict, n: int, seed: int) -> tuple[list[dict], dict]:
     }
     truth["_global"] = {"prefer_no_display": 0.15, "repeat_consistency": 0.85, "cvd_share": 0.08}
     scene_meta = {sc["id"]: sc for sc in design["scenes"]}
+    variants_of = {p["id"]: p["variants"] for p in design["properties"] if p.get("variants")}
     points = design["ab"]["scale_points"]
     documents = []
     for i in range(n):
@@ -98,7 +99,9 @@ def simulate(design: dict, n: int, seed: int) -> tuple[list[dict], dict]:
                  levels: tuple[str, str] = ("low", "high")) -> None:
             a_level = levels[0] if rng.random() < 0.5 else levels[1]
             b_level = levels[1] if a_level == levels[0] else levels[0]
+            variants = variants_of.get(prop)
             add("ab", index=index, property=prop, scene=scene, a_level=a_level, b_level=b_level, noticed=noticed,
+                high_variant=str(rng.choice(variants)) if variants else None,
                 preferred_option="A" if level == a_level else "B", preferred_level=level, repeat=repeat,
                 importance=int(np.clip(round((points + 1) / 2 + 1.2 * utility.get(prop, 0)), 1, points)),
                 ratings={lvl: {key: int(rng.integers(1, points + 1)) for key in RATING_KEYS} for lvl in levels},

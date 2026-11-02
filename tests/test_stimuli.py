@@ -61,10 +61,12 @@ def test_every_screened_property_can_be_rendered(setup):
                          ids=lambda p: p["id"])
 def test_low_and_high_clips_differ(setup, prop):
     _, renderer, base = setup
+    from render_stimuli import high_levels
     low = render_all(renderer, Style.from_overrides(base, prop["render"]["low"]))
-    high = render_all(renderer, Style.from_overrides(base, prop["render"]["high"]))
-    changed = np.abs(low.astype(int) - high.astype(int)).max(axis=3) > 8
-    assert changed.sum() > 50, f"{prop['id']}: low and high clips look the same"
+    for suffix, overrides in high_levels(prop).items():
+        high = render_all(renderer, Style.from_overrides(base, overrides))
+        changed = np.abs(low.astype(int) - high.astype(int)).max(axis=3) > 8
+        assert changed.sum() > 50, f"{prop['id']}: low and {suffix} clips look the same"
 
 
 def test_baseline_leaves_frames_untouched_outside_the_event(setup):

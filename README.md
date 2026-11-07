@@ -1,154 +1,263 @@
 # Which visual properties matter in AV explanation displays
 
-Crowdsourced study to decide, from the literature and from participants watching driving clips, which visual
-properties of an automated-vehicle (AV) explanation display are worth personalising. The result is a ranked set of
-about four properties, their usable ranges, and fixed values for everything else. A later preference optimisation
-then tunes only the selected properties.
+A crowdsourced study to decide which visual properties of an automated-vehicle (AV) explanation display are worth
+personalising. Participants watch real dashcam clips with an explanation display drawn on top, rank the display's
+properties and compare clips that differ in one property. Pre-registered rules then select about four properties,
+their usable ranges, and fixed values for everything else. A follow-up preference optimisation tunes only those.
 
-The code implements the study design: a literature review gives the candidate properties, a crowdsourced study
-measures which of them matter and which people disagree about, and pre-registered rules select the final set. The
-crowdsourcing setup follows
-[bazilinskyy/ehmi-vehicles](https://github.com/bazilinskyy/ehmi-vehicles): a [jsPsych](https://www.jspsych.org) 8
-experiment served by Node.js (Express) from a TU/e server, with the analysis in Python.
+<p align="center">
+  <img src="docs/figures/display.gif" width="640" alt="The default display in Valencia: the planned path on the road and markers above the pedestrians the car reacts to">
+  <br><em>The default display in one of the 19 scenes: the car's planned path, and markers above the pedestrians it
+  reacts to.</em>
+</p>
 
-## Experiment
-The experiment is in `public/views/experiment.html` and `public/js/experiment.js`. `app.js` serves it and the video stimuli,
-and stores the data in a JSON lines file on the server (or, with `CONNECTION` set, in a MongoDB database). jsPsych and its plugins are installed from npm and served by
-`app.js`.
+The crowdsourcing setup follows [bazilinskyy/ehmi-vehicles](https://github.com/bazilinskyy/ehmi-vehicles): a
+[jsPsych](https://www.jspsych.org) 8 experiment served by Node.js (Express), with the analysis in Python.
 
-### Procedure
-1. The clips of the participant are preloaded and the browser switches to full screen.
-2. Device check: phones, tablets and screens smaller than 1280 × 720 px cannot continue.
-3. Welcome, information sheet and consent. Declining ends the study.
-4. Demographics (age, nationality and country of residence from an ISO 3166 list, gender, driving licence, car use,
-   experience with driver assistance, self-driving rides, familiarity with head-up displays, colour vision
-   deficiency).
-5. Questionnaires (`study/questionnaires.json`): propensity to trust automation (Körber 2019, 3 items) and affinity
-   for technology interaction (ATI, Franke et al. 2019, 9 items), to test whether preferences split by user type.
-6. **Comprehension**: one short clip per scene that has a question (not the baseline scene), showing one property at a
-   random level. The clip stops before the car acts and the participant answers "What will the car do next?". This
-   comes before any property is named, so nothing but the display tells them the answer.
-7. **Task C**: a baseline video of the display, then the open question "What would you want this display to show, or
-   show differently?", asked before any property is named.
-8. **Task A**: Best-Worst Scaling (jsPsych MaxDiff). Each trial shows 4 properties; the participant picks the most and
-   least important for understanding what the car is doing and why. Each property comes with a short looping preview
-   of its levels side by side (`public/stimuli/previews/`), so it is judged from what it looks like and not only from
-   its name. With the 17 screened-in properties that is 13 trials.
-9. **Task B**: A/B video pairs. For each of 10 properties, the same situation with the property at its low and high
-   level (side randomised): did you notice a difference, which would you prefer while riding, how much does it matter
-   (1–7), and for each video understanding, perceived safety and mental load (1–7). Mixed in: one pair of the display
-   vs the same clip with no display. At the end, 3 of the pairs again with the sides swapped, to measure how
-   consistent each participant is.
-10. Five attention checks are mixed in between the trials of Tasks A and B; three wrong answers end the study
-    (`finish_fail`).
-11. An optional final comment, then the finish page with the participant's completion code.
+**Contents:** [How it works](#how-it-works) · [The properties](#the-properties) · [The scenes](#the-scenes) ·
+[What participants do](#what-participants-do) · [Making the stimuli](#making-the-stimuli) ·
+[Running the experiment](#running-the-experiment) · [Analysis](#analysis) · [Data and privacy](#data-and-privacy) ·
+[Repository layout](#repository-layout) · [Footage](#footage)
 
-Data is saved after every trial, so the answers of participants who stop early are kept. The order of trials, the BWS
-version, the scene per property and the side of each level are seeded with the worker code.
+## How it works
 
-### Stimuli
-`study/properties.json` lists the candidate properties from the literature review
-(`reports/AV display property literature.md`): the 17 screened in, 3 reserves, and the ones fixed or excluded with the
-reason. The screened-in set includes the four parameters of the follow-up preference study (highlight strength
-`mask_alpha`, path opacity `trajectory_alpha`, background dimming `background_dim_alpha` and colour palette
-`palette_id`), with the same ranges and defaults, so that study's choice of parameters can be checked against what
-participants rank here. `study/scenes.json` lists the driving situations. Every scene needs, under `public/stimuli/<scene id>/`:
-`baseline.mp4`, `none.mp4` (the clip without a display), and `<property id>_low.mp4` plus `<property id>_high.mp4` for
-every screened-in property. A property with more than two levels lists `variants` and has one
-`<property id>_high_<variant>.mp4` per variant (the palette: the standard palette against the Okabe-Ito, minimalist
-and high-saliency palettes); each participant sees one variant, at random. The two clips of a pair must differ in that
-one property only.
-
-Each scene records the `country` it was filmed in (ISO code) and its `criticality` (low or high risk), so the
-analysis can compare preferences between risky and calm situations, and between clips from a participant's own
-country and from elsewhere. For both comparisons to work, include scenes of both criticality levels and from more
-than one country. Properties whose two clips differ mainly in hue are marked `colour_dependent`.
-
-The clips are made, not filmed: a real dashcam clip with the explanation display drawn on top by
-`avprops/clip_render.py`. Every property is a parameter of that renderer, and each property in `properties.json` has a
-`render` block with the settings of its low and high clip; everything else stays at the `baseline`. A property without a
-`render` block cannot be made as a clip and must stay screened out, and `tests/test_stimuli.py` checks that the low
-and high clip of every renderable property actually differ on screen.
-
-The renderer draws from per-frame overlay geometry: the planned path, the road users with outlines, boxes, distances
-and track ids, an occlusion map and the explanation ramp (format documented in `avprops/clip_render.py`). The scenes
-use geometry from a full perception pipeline (`data/geometry_pipeline/`): YOLO26x segmentation with ByteTrack,
-SegFormer road segmentation, Depth Anything V2 distances, a camera auto-calibration per clip, and a planned path
-anchored to the road from visual odometry of the car's actual motion. Each scene's `geometry` names its file; a
-`camera` in the scene is only given where the auto-calibration found none, and then wins over the geometry's.
-Geometry made from footage above 1280 px wide is scaled down on reading, so every stimulus is 1280×720.
-`extract_geometry.py` is a simpler fallback with YOLO segmentation and ByteTrack and a straight path in the car's
-lane.
-
-```bash
-uv sync --extra extract                                  # detection and tracking dependencies
-uv run python extract_geometry.py --device mps           # data/geometry/<scene>_geometry.jsonl.gz (cuda:0 on a GPU host)
-uv run python render_stimuli.py --calibrate              # check each scene's camera constants
-uv run python render_stimuli.py --preview                # a still of every clip, as a contact sheet
-uv run python render_stimuli.py --check                  # how much each pair differs in each scene
-uv run python make_design.py                             # uses the check to pick scenes per property
-uv run python render_stimuli.py                          # the clips, as H.264, into public/stimuli/
-uv run python render_stimuli.py --previews               # the BWS previews, from the rendered clips
-uv run python make_design.py                             # again, so the design lists the previews
+```mermaid
+flowchart LR
+    lit["Literature review<br/>~35 candidate properties"] --> screen["Screening<br/>17 properties that can be<br/>shown in a clip"]
+    dash["Dashcam drives<br/>in many cities"] --> scan["scan_videos.py<br/>calm and risky stretches"]
+    scan --> geo["Perception pipeline<br/>road users, path, depth,<br/>camera calibration"]
+    geo --> render["render_stimuli.py<br/>low and high clip<br/>per property and scene"]
+    screen --> render
+    render --> exp["Online experiment<br/>ranking + A/B pairs"]
+    exp --> ana["analysis.py<br/>pre-registered rules"]
+    ana --> sel["~4 properties<br/>to personalise"]
 ```
 
-A property can only differ in a scene that has what it acts on: other road users' paths need people moving sideways,
-colour by type needs vehicles, "when shown" needs an event with a few seconds before it. `--check` measures, per scene,
-the share of pixels that differ between the low and high clip over the whole clip and flags pairs below 0.2% as
-`WEAK`. It saves the result to `data/stimulus_check.json`; `make_design.py` then lets each property's A/B pair use
-only the scenes where it passed, and stops with an error if a property passes in none. The threshold is a screen for
-pairs with nothing to show, not proof that people notice the difference; the "did you notice" answers in the pilot do
-that.
+1. The literature review (`reports/AV display property literature.md`) lists the candidate properties and the
+   evidence for each. Properties with consensus are fixed; those that can be shown in a video clip are screened in.
+2. Scenes are cut from long dashcam drives in many cities (the CROWD dataset): one calm and one risky stretch per city.
+3. A perception pipeline extracts, per frame, the road users, the car's planned path, distances and the camera
+   calibration. The renderer draws the display from that geometry, once per property level, so the two clips of a
+   pair differ in that one property only.
+4. Participants rank the properties (Best-Worst Scaling) and compare A/B clips; the analysis applies the selection
+   rules.
 
-Because the pipeline's path covers only where the car actually drives, it is short or absent while the car stands
-still, so the path properties pass the check mostly in scenes where the car moves. The highlight properties act on
-pedestrians (the road users the car reacts to) and so pass mostly in the risky scenes. Both limit how far the calm vs
-risky comparison can be read for those properties; `make_design.py` prints the scenes each property may use. Other
-road users' paths show only sideways movement, because the camera car's own speed is not subtracted.
+## The properties
 
-Source clips go in `data/clips/` and, like the rendered stimuli, are not in git.
+`study/properties.json` lists every candidate property with its source, its levels and why it was screened in or out.
+The 17 screened in:
 
-**Finding scenes.** The scenes come from long dashcam drives in many cities (the CROWD dataset), one calm and one
-risky stretch per city. `scan_videos.py` proposes them:
+| Element | Property | Low | High |
+|---|---|---|---|
+| Planned path | Path visibility (`trajectory_alpha`) | Faint | Solid |
+| Planned path | Path width (`path_width`) | Thin line | Car-wide band |
+| Planned path | Path length (`path_length`) | Short (about 8 m) | Long (about 35 m) |
+| Planned path | Path style (`path_style`) | Plain band | Flowing arrows |
+| Planned path | Path certainty colour (`path_uncertainty`) | One colour | Colour changes with distance |
+| Planned manoeuvre | Manoeuvre cue (`manoeuvre_cue`) | None | Icon and text, e.g. "Turning left" |
+| Road users | Highlight strength (`mask_alpha`) | Subtle | Strong |
+| Road users | Which road users are highlighted (`highlight_scope`) | Only those the car reacts to | All detected |
+| Road users | Highlight style (`highlight_style`) | Outline | Filled shape |
+| Road users | Colour by road-user type (`class_colours`) | One colour for all | Different colour per type |
+| Road users | Pedestrian marker size (`marker_size`) | Small | Large |
+| Road users | Other road users' paths (`predicted_paths`) | Off | On |
+| Text | Explanation detail (`explanation_detail`) | None | e.g. "Stopping: pedestrians crossing" |
+| Timing | When the display is shown (`show_when`) | Only around the event | Always |
+| Vehicle state | Confidence indicator (`confidence_indicator`) | None | Confidence bar |
+| Context | Background dimming (`background_dim_alpha`) | None | Strong |
+| Colour | Colour palette (`palette_id`) | Standard | Okabe-Ito, minimalist HUD or high saliency |
+
+The set includes the four parameters of the follow-up preference study (highlight strength, path visibility,
+background dimming and colour palette) with the same ranges and defaults, so that study's choice of parameters can be
+checked against what participants rank here. Distance labels, a status panel and the panel position are kept as
+reserves; placement, audio, on-demand display, explanation timing, path shape and text size are fixed or excluded,
+with the reason in `properties.json`.
+
+<p align="center">
+  <img src="docs/figures/properties.jpg" alt="Every property at its low and high level, each in the scene where the two differ most">
+  <br><em>Every property at its low (left) and high (right) level, in the scene where the two clips differ most.</em>
+</p>
+
+The palette has three alternatives to the standard one; each participant sees one of them, at random:
+
+<p align="center">
+  <img src="docs/figures/palettes.jpg" alt="The four colour palettes in the same frame">
+</p>
+
+## The scenes
+
+Nineteen 14-second scenes: one calm and one risky stretch from each of eight cities on four continents, plus three
+earlier scenes from the USA and Egypt. Each scene records its country (to compare clips from a participant's own country with
+clips from elsewhere) and its criticality (to compare calm and risky situations).
+
+<p align="center">
+  <img src="docs/figures/scenes.jpg" alt="A frame of each of the 19 scenes during its event, with the default display">
+</p>
+
+| Scene | City | Country | Risk | Source (start) |
+|---|---|---|---|---|
+| `pedestrian_crossing` | – | USA | risky | [TuCsyBF3nHU at 77:11](https://www.youtube.com/watch?v=TuCsyBF3nHU&t=4631s) |
+| `braking_in_traffic` | – | Egypt | calm | [Esyp2P0uJu4 at 4:48](https://www.youtube.com/watch?v=Esyp2P0uJu4&t=288s) |
+| `unexpected_obstacle` | – | Egypt | risky | [Esyp2P0uJu4 at 4:36](https://www.youtube.com/watch?v=Esyp2P0uJu4&t=276s) |
+| `rotterdam_calm` | Rotterdam | Netherlands | calm | [m9M4MYI_tAY at 16:22](https://www.youtube.com/watch?v=m9M4MYI_tAY&t=982s) |
+| `rotterdam_risky` | Rotterdam | Netherlands | risky | [m9M4MYI_tAY at 42:27](https://www.youtube.com/watch?v=m9M4MYI_tAY&t=2547s) |
+| `valencia_calm` | Valencia | Spain | calm | [G7wQRZ3nopk at 40:18](https://www.youtube.com/watch?v=G7wQRZ3nopk&t=2418s) |
+| `valencia_risky` | Valencia | Spain | risky | [G7wQRZ3nopk at 44:19](https://www.youtube.com/watch?v=G7wQRZ3nopk&t=2659s) |
+| `chicago_calm` | Chicago | USA | calm | [XzwI2rGmf04 at 11:56](https://www.youtube.com/watch?v=XzwI2rGmf04&t=716s) |
+| `chicago_risky` | Chicago | USA | risky | [XzwI2rGmf04 at 59:19](https://www.youtube.com/watch?v=XzwI2rGmf04&t=3559s) |
+| `mexico_city_calm` | Mexico City | Mexico | calm | [MpA3FHZ3yZc at 39:34](https://www.youtube.com/watch?v=MpA3FHZ3yZc&t=2374s) |
+| `mexico_city_risky` | Mexico City | Mexico | risky | [MpA3FHZ3yZc at 2:44](https://www.youtube.com/watch?v=MpA3FHZ3yZc&t=164s) |
+| `jaipur_calm` | Jaipur | India | calm | [jwZV8i60Sbs at 14:14](https://www.youtube.com/watch?v=jwZV8i60Sbs&t=854s) |
+| `jaipur_risky` | Jaipur | India | risky | [jwZV8i60Sbs at 1:34](https://www.youtube.com/watch?v=jwZV8i60Sbs&t=94s) |
+| `hanoi_calm` | Hanoi | Vietnam | calm | [AKaJkDqrOjU at 6:08](https://www.youtube.com/watch?v=AKaJkDqrOjU&t=368s) |
+| `hanoi_risky` | Hanoi | Vietnam | risky | [AKaJkDqrOjU at 8:17](https://www.youtube.com/watch?v=AKaJkDqrOjU&t=497s) |
+| `kobe_calm` | Kobe | Japan | calm | [TJjqYeYyIoE at 10:36](https://www.youtube.com/watch?v=TJjqYeYyIoE&t=636s) |
+| `kobe_risky` | Kobe | Japan | risky | [TJjqYeYyIoE at 24:16](https://www.youtube.com/watch?v=TJjqYeYyIoE&t=1456s) |
+| `sydney_calm` | Sydney | Australia | calm | [wMu6Va5PhGY at 4:06](https://www.youtube.com/watch?v=wMu6Va5PhGY&t=246s) |
+| `sydney_risky` | Sydney | Australia | risky | [wMu6Va5PhGY at 31:46](https://www.youtube.com/watch?v=wMu6Va5PhGY&t=1906s) |
+
+`study/scenes.json` also holds each scene's explanation texts; `texts_verified` stays false until someone has checked
+them against the clip.
+
+## What participants do
+
+The study takes about 30 minutes, on a computer (phones, tablets and screens below 1280 × 720 px cannot take part).
+
+```mermaid
+flowchart TD
+    A[Consent and demographics] --> B[Questionnaires:<br/>trust in automation, affinity for technology]
+    B --> C[Comprehension:<br/>clip stops, 'what will the car do next?']
+    C --> D[Baseline clip + open question]
+    D --> E[Task A: rank properties<br/>13 Best-Worst Scaling trials]
+    E --> F[Task B: 10 A/B pairs<br/>+ display vs no display]
+    F --> G[3 pairs repeated, sides swapped]
+    G --> H[Final comment, completion code]
+```
+
+1. **Consent and demographics:** age, nationality and country of residence, gender, driving licence, car use,
+   experience with driver assistance and self-driving cars, familiarity with head-up displays, colour vision.
+2. **Questionnaires** (`study/questionnaires.json`): propensity to trust automation (Körber 2019, 3 items) and
+   affinity for technology interaction (ATI, Franke et al. 2019, 9 items), to test whether preferences split by user
+   type.
+3. **Comprehension:** one clip per scene with a question, at a random level of one property. The clip stops before the
+   car acts and the participant answers "What will the car do next?", before any property is named.
+4. **Open question (Task C):** a baseline clip, then "What would you want this display to show, or show differently?"
+5. **Ranking (Task A):** Best-Worst Scaling. Each trial shows 4 properties; the participant picks the most and least
+   important for understanding what the car is doing and why. Each property comes with a looping preview of its two
+   levels side by side, so it is judged from what it looks like and not only from its name.
+6. **A/B pairs (Task B):** for 10 properties, the same situation with the property at its low and high level (sides
+   randomised): did you notice a difference, which would you prefer while riding, how much does it matter (1–7), and
+   for each clip understanding, perceived safety and mental load (1–7). Mixed in: the display vs the same clip without
+   a display. At the end, 3 pairs again with the sides swapped, to measure consistency.
+7. Five attention checks between the trials; three wrong answers end the study, with a partial payment.
+
+<table>
+  <tr>
+    <td width="45%"><img src="docs/figures/screen_ranking.jpg" alt="A ranking trial: four properties, each with a preview, most and least important"></td>
+    <td width="55%"><img src="docs/figures/screen_pair.jpg" alt="An A/B pair: the same scene with and without the manoeuvre cue, and the questions below"></td>
+  </tr>
+  <tr>
+    <td><em>Task A: a ranking trial.</em></td>
+    <td><em>Task B: an A/B pair (here: the manoeuvre cue in Hanoi).</em></td>
+  </tr>
+</table>
+
+<p align="center">
+  <img src="docs/figures/preview.gif" width="640" alt="A ranking preview: highlight strength at its low and high level">
+  <br><em>A ranking preview: highlight strength, subtle (left) and strong (right).</em>
+</p>
+
+Data is saved after every trial, so the answers of participants who stop early are kept. The order of trials, the BWS
+version (50 balanced versions), the scene per property and the side of each level are seeded with the participant's
+code.
+
+## Making the stimuli
+
+The clips are made, not filmed: a real dashcam clip with the display drawn on top by `avprops/clip_render.py`. Every
+property is a parameter of that renderer, and each property in `properties.json` has a `render` block with the
+settings of its low and high clip; everything else stays at the `baseline`. Source clips (`data/clips/`), geometry and
+rendered clips (`public/stimuli/`) are not in git.
+
+**Finding scenes.** `scan_videos.py` decodes each long drive at 2 frames per second, detects road users with YOLO and
+scores every 14 s window by how close and central the road users ahead are (pedestrians, cyclists and motorcyclists
+weigh 1.5 times as much). It leaves out windows with a cut, dark windows and, with `--segments`, anything outside the
+stretches the dataset's mapping lists as car driving in the locality, and writes the calmest and riskiest windows
+with a strip of frames to review. The score is a screen, not a measure of danger, so every scene is chosen by eye.
 
 ```bash
 uv run --extra extract python scan_videos.py VIDEOS... --segments segments.csv --device cuda:0
 ```
 
-It decodes each video at 2 frames per second, detects road users with YOLO and scores every 14 s window by how
-close and central the road users ahead are (pedestrians, cyclists and motorcyclists weigh 1.5 times as much),
-leaving out windows with a cut, dark windows (dusk, night) and, with `--segments`, anything outside the stretches the
-dataset's mapping lists as car driving in the locality. It writes the calmest (with some traffic) and riskiest
-windows of each video with a strip of frames to review. The score is a screen, not a measure of danger: big trucks
-close ahead score high even in a queue, and a video's label can be wrong (one "car" video turned out to be a
-walking tour), so every scene is chosen by eye. Scenes record their `source` video and start, `country` and
-`criticality`, and `texts_verified` stays false until someone has checked the explanation texts against the clip. `make_design.py` lists the clips the
-design needs that are still missing.
+**Geometry.** The renderer draws from per-frame overlay geometry: the planned path, the road users with outlines,
+boxes, distances and track ids, an occlusion map and the explanation ramp (format documented in
+`avprops/clip_render.py`). The scenes use geometry from a perception pipeline (`data/geometry_pipeline/`): YOLO26x
+segmentation with ByteTrack, SegFormer road segmentation, Depth Anything V2 distances, a camera auto-calibration per
+clip, and a planned path anchored to the road from visual odometry of the car's actual motion. A scene's `camera` is
+only given where the auto-calibration found none. `extract_geometry.py` is a simpler fallback (YOLO segmentation,
+ByteTrack and a straight path in the car's lane).
 
-After any change to the properties, scenes or settings, regenerate the design:
+**Rendering.**
+
+```bash
+uv sync --extra extract                                  # detection and tracking dependencies
+uv run python extract_geometry.py --device mps           # fallback geometry (cuda:0 on a GPU host)
+uv run python render_stimuli.py --calibrate              # check each scene's camera constants
+uv run python render_stimuli.py --preview                # a still of every clip, as a contact sheet
+uv run python render_stimuli.py --check                  # how much each pair differs in each scene
+uv run python make_design.py                             # uses the check to pick scenes per property
+uv run python render_stimuli.py                          # the clips, as H.264, into public/stimuli/
+uv run python render_stimuli.py --previews               # the ranking previews, from the rendered clips
+uv run python make_design.py                             # again, so the design lists the previews
+uv run python make_figures.py                            # the figures in this README
+```
+
+Every scene gets, under `public/stimuli/<scene id>/`: `baseline.mp4`, `none.mp4` (no display), and
+`<property>_low.mp4` plus `<property>_high.mp4` (for the palette, one `palette_id_high_<variant>.mp4` per
+alternative). Clips are drawn at 1280 × 720 and delivered at 960 × 540 (about 35 MB per participant);
+`render_stimuli.py --reencode` shrinks clips rendered before that.
+
+**Which scenes a property uses.** A property can only differ in a scene that has what it acts on: other road users'
+paths need people moving sideways, colour by type needs vehicles, "when shown" needs an event with a few seconds
+before it. `--check` measures, per scene, the share of pixels that differ between the low and high clip and flags
+pairs below 0.2% as `WEAK`; `make_design.py` then lets each property's A/B pair use only the scenes where it passed.
+Because the pipeline's path covers only where the car actually drives, the path properties pass mostly in scenes
+where the car moves; the highlight properties act on pedestrians and pass mostly in the risky scenes. Both limit how
+far the calm vs risky comparison can be read for those properties.
+
+After any change to the properties, scenes or settings, regenerate the design (`public/design.json`):
 
 ```bash
 uv run python make_design.py
 ```
 
-This writes `public/design.json`: the balanced BWS design (50 versions), the properties and scenes, and the A/B and
-attention settings.
+## Running the experiment
 
-### Running the experiment
-Install the dependencies with `npm install` and start the server with
-`CONNECTION='<MongoDB connection string>' npm start`, then open http://localhost:3000. Without `CONNECTION` the server
-stores the data in `data/entries.jsonl` (or the file named by `DATA_FILE`), in the same shape as a MongoDB export. URL parameters:
-* `debug=true`: log details to the browser console, skip the device check, allow continuing before a video ends, show
-  the names of missing clips, and mark the data as debug (excluded from the analysis).
+```bash
+npm install
+npm start                                                # http://localhost:3000
+```
+
+Responses are appended to `data/entries.jsonl`, or to the file named by `DATA_FILE`. With `CONNECTION` set to a
+MongoDB connection string they go to MongoDB instead, as in ehmi-vehicles.
+
+URL parameters:
+* `debug=true`: log to the browser console, skip the device check, allow continuing before a video ends, show the
+  names of missing clips, and mark the data as debug (excluded from the analysis).
+* `skip_to=tasks` (with `debug=true`): start at the ranking and A/B tasks.
 * `save_data=false`: do not send data to the server.
 * `worker_code=<code>`: participant code to store with the data and show on the finish page. `PROLIFIC_PID` is used
   when present; otherwise a random 14-character code is made.
 * `platform=<name>`: recruitment platform, stored with the data (e.g. `platform=microworkers`).
 
-**Recruitment on Microworkers.** Give the campaign the link `https://<server>/?platform=microworkers` and ask for
-the completion code as proof. The link carries no worker ID: every participant gets a random code, which the finish
-page shows (and the attention-fail page too, for the partial payment). Only Microworkers can link a code to a worker.
-To approve submissions:
+**Hosting.** The live study runs on a TU/e-managed virtual server, so no participant data goes to an outside hosting,
+database or video service: `app.js` serves the experiment and the clips, writes the responses to `DATA_FILE` on TU/e
+storage, and nginx in front keeps no access log. [`deploy/`](deploy/README.md) has the setup (systemd unit, nginx
+configuration, steps).
+
+**Recruitment on Microworkers.** Give the campaign the link `https://<server>/?platform=microworkers` and ask for the
+completion code as proof. The link carries no worker ID: every participant gets a random code, which the finish page
+shows (and the attention-fail page too, for the partial payment), so only Microworkers can link a code to a worker. To
+approve submissions:
 
 ```bash
 uv run python payments.py --data /srv/study-data/entries.jsonl --check CODE1 CODE2 ...
@@ -159,88 +268,104 @@ with a `review` column of quality flags (answered too fast, same IP address as a
 researcher to decide on by hand; no payment is refused automatically. Delete `payments.csv` once everyone is paid.
 
 **Sample.** To compare regions, run one campaign per region with the platform's country targeting and its own quota,
-and keep the groups roughly equal, rather than relying on whoever signs up. Leave out countries where the data may
-not be processed (see the data management plan).
-
-The live study runs on a TU/e-managed virtual server, so that no participant data goes to an outside hosting,
-database or video service: `app.js` serves the experiment and the clips, writes the responses to `DATA_FILE` on TU/e
-storage, and nginx in front keeps no access log. `deploy/` has the setup (systemd unit, nginx configuration, steps).
-The `Procfile` and `CONNECTION` remain for running it on Heroku with MongoDB, as in ehmi-vehicles.
+and keep the groups roughly equal. Leave out countries where the data may not be processed (see the data management
+plan).
 
 ## Analysis
+
 The analysis is in the `avprops` package, started by `analysis.py`. Tested with Python 3.12.13 and
 [`uv`](https://docs.astral.sh/uv/):
 
 ```bash
 uv sync
-uv run python analysis.py
+uv run python analysis.py --data data/entries.jsonl
 ```
 
-### Configuration
-Settings are read from `config` and secrets from `secret` in the repository folder. Both are not in git: create them
-from `default.config` and `default.secret`. If there is no `config`, `default.config` is used.
-
-`config`:
-* `path_data`, `files_heroku`: folder and files with the data exported from MongoDB.
-* `download_data`: export the data from MongoDB into the first of `files_heroku` before the analysis (needs
-  `mongoexport` and `mongodb_uri` in `secret`).
-* `bws_items_per_trial`, `bws_appearances_per_item`, `bws_design_versions`: the BWS design.
-* `ab_pairs_per_participant`: A/B pairs per participant (10; 0 = all properties); `ab_repeats`: pairs repeated with
-  the sides swapped (3); `ab_no_display`: add the display vs no display pair; `comprehension`: ask "what will the car
-  do next?" in the scenes that have a `comprehension` block; `questionnaires`: which questionnaires to ask;
-  `ab_collect_ratings`: ask the three
-  ratings for both videos.
-* `attention_fail_at`: wrong attention answers that end the study.
-* `colour_properties_without_cvd`: leave participants who report a colour vision deficiency out of the main results
-  of `colour_dependent` properties (they are still compared in `subgroups.csv`).
-* Exclusions: `exclude_debug`, `exclude_unfinished`, `attention_max_wrong`, `min_median_bws_rt_ms`,
-  `min_repeat_consistency` (0 = report consistency only),
-  `max_hidden_ab_share` (share of A/B pairs during which the participant left the page), `exclude_duplicate_ip`
-  (keep only the first participant from each IP address, as in Bazilinskyy et al., 2022,
-  https://doi.org/10.54941/ahfe1002444).
-* Selection rules: `select_n` (4), `noticed_min_share` (0.70), `matters_top_fraction` (0.5),
-  `disagreement_max_majority_share` (0.75), `redundancy_min_abs_r` (0.70). Set them in the pilot, then pre-register.
-
-`secret`:
-* `mongodb_uri`: connection string of the MongoDB database, including the password.
-
-### Running the analysis
-`uv run python analysis.py` reads `files_heroku` in `path_data`; `--data <file>` reads other files, for example
-`data/entries.jsonl` from a local run. To export the data by hand:
-`mongoexport --uri <mongodb_uri> --collection entries --type json --out data/heroku_0.json`.
-
+### Outputs
 Outputs go to `_output/` (not in git, as they hold personal data):
 * `participants.csv`: every participant: finished, attention answers, questionnaire scores, repeat consistency,
   whether they preferred no display, comprehension, excluded and why. IP addresses appear only as placeholders
-  (0.0.0.1, 0.0.0.2, ...), the same one for the same address.
+  (0.0.0.1, 0.0.0.2, ...).
 * `summary.csv`: per property the BWS score with bootstrap CI, share noticing, preference split, importance, rating
-  differences with Wilcoxon tests, comprehension after the low vs the high clip (Fisher's exact test), the
-  correlation of choosing the high level with each questionnaire score, and its status. Repeated pairs and the
-  no-display pair are left out of these.
-* `subgroups.csv`: per property, noticing and preference in low vs high criticality scenes, in clips from the
-  participant's own country vs elsewhere, and (colour-dependent properties) with vs without a colour vision
-  deficiency, each with Fisher's exact test.
-* `redundant.csv`, `open_answers.csv` (for thematic coding of Task C) and `report.md`, which also gives the overall
-  repeat consistency, the share of participants who preferred no display, the countries of residence and the
-  subgroup differences.
+  differences with Wilcoxon tests, comprehension after the low vs the high clip (Fisher's exact test), the correlation
+  of choosing the high level with each questionnaire score, and its status.
+* `subgroups.csv`: per property, noticing and preference in calm vs risky scenes, in clips from the participant's own
+  country vs elsewhere, and (colour-dependent properties) with vs without a colour vision deficiency.
+* `redundant.csv`, `open_answers.csv` (for thematic coding of Task C) and `report.md`, with the selected properties
+  and where every other one stopped.
 
-**Publishing the data.** `uv run python export_public.py --data <file> --out _output/public` writes the anonymised
-dataset: new random participant numbers instead of the codes, no IP addresses, age in bands, and the open answers in
-a separate file to redact by hand before publishing (`avprops/publish.py`).
-
+### Selection rules
 Every property gets a status saying where it stopped: `not noticed`, `does not matter`, `consensus: fix at low/high`,
-`redundant with …`, `eligible, below cut-off`, or `selected`.
+`redundant with …`, `eligible, below cut-off`, or `selected`. A property is selected when it is noticed by at least
+70% of participants, is in the top half by BWS score or changes a rating, has no clear majority preference (at most
+75%), is not redundant with a higher-ranked property (|r| < 0.70), and is among the top 4 by BWS score. Set the
+thresholds in the pilot, then pre-register them.
 
-To check the analysis before real data exists, `simulate.py` writes synthetic participants with a known truth in the
-same format as the server:
+### Configuration
+Settings are read from `config`, secrets from `secret`; create them from `default.config` and `default.secret` (if
+there is no `config`, `default.config` is used).
+* `path_data`, `files_heroku`, `download_data`: where the data is (and, with MongoDB, whether to export it first;
+  needs `mongoexport` and `mongodb_uri` in `secret`).
+* `bws_items_per_trial`, `bws_appearances_per_item`, `bws_design_versions`: the BWS design.
+* `ab_pairs_per_participant` (10), `ab_repeats` (3), `ab_no_display`, `ab_collect_ratings`, `comprehension`,
+  `questionnaires`: the parts of the study.
+* `attention_fail_at`: wrong attention answers that end the study.
+* `colour_properties_without_cvd`: leave participants with a colour vision deficiency out of the main results of
+  `colour_dependent` properties (they are still compared in `subgroups.csv`).
+* Exclusions: `exclude_debug`, `exclude_unfinished`, `attention_max_wrong`, `min_median_bws_rt_ms`,
+  `min_repeat_consistency`, `max_hidden_ab_share`, and `exclude_duplicate_ip` (keep only the first participant from
+  each IP address, as in [Bazilinskyy et al., 2022](https://doi.org/10.54941/ahfe1002444)).
+* Selection rules: `select_n`, `noticed_min_share`, `matters_top_fraction`, `disagreement_max_majority_share`,
+  `redundancy_min_abs_r`.
+
+### Testing without real data
+`simulate.py` writes synthetic participants with a known truth in the same format as the server:
 
 ```bash
 uv run python simulate.py --n 150
 uv run python analysis.py --data data/simulated/entries.jsonl --out _output/simulated
-```
-
-### Tests
-
-```bash
 uv run pytest
 ```
+
+## Data and privacy
+
+* **Collected:** answers and response times, age, gender, nationality, country of residence, driving experience,
+  colour vision (optional), browser and screen type, and the IP address. No names, email addresses or exact locations.
+* **IP addresses** are stored with the responses only to find people who take part more than once. The analysis keeps
+  the first participant per address and then replaces the addresses with placeholders, as in
+  [Bazilinskyy et al., 2022](https://doi.org/10.54941/ahfe1002444) ([data](https://doi.org/10.4121/19102133)).
+* **Published:** `export_public.py` writes the anonymised dataset (new random participant numbers instead of the
+  codes, no IP addresses, age in bands, open answers in a separate file to redact by hand):
+
+  ```bash
+  uv run python export_public.py --data /srv/study-data/entries.jsonl --out _output/public
+  ```
+
+* The participant information sheet and consent are in `public/js/study-text.js`; fill in the placeholders with the
+  ethics-approved wording before the pilot.
+
+## Repository layout
+
+| Path | What |
+|---|---|
+| `study/` | properties, scenes and questionnaires (the study's content) |
+| `reports/` | literature review behind the properties |
+| `public/` | the experiment (`views/`, `js/`, `css/`), `design.json`, and the clips in `stimuli/` (not in git) |
+| `app.js` | the server: serves the experiment and clips, stores the responses |
+| `deploy/` | setup for the TU/e server |
+| `avprops/` | Python package: scanning, geometry, rendering, design, data reading, analysis, publication |
+| `scan_videos.py`, `extract_geometry.py`, `render_stimuli.py`, `make_design.py` | making the stimuli and the design |
+| `analysis.py`, `payments.py`, `export_public.py`, `simulate.py` | analysis, payments, publication, simulation |
+| `make_figures.py`, `docs/figures/` | the figures in this README |
+| `tests/` | tests (`uv run pytest`) |
+
+## Footage
+
+The scenes are short segments of public dashcam videos on YouTube (linked in [the scenes table](#the-scenes)); the
+rights stay with their owners. The clips are used for research only and are not redistributed: this repository holds
+the code to make them, and the figures above are small stills for illustration. The scene selection builds on the
+CROWD dataset of dashcam drives.
+
+## License
+
+Code under the [MIT License](LICENSE). The footage is not covered by it (see above).

@@ -13,6 +13,7 @@
 //   debug=true          log to the console, skip the device check, allow continuing
 //                       before a video ends, and mark every row debug = true
 //   save_data=false     do not send data to the server
+//   skip_to=tasks       with debug=true: start at the ranking and A/B tasks (for testing)
 //   worker_code=<code>  code of the participant (PROLIFIC_PID is used when present;
 //                       otherwise a random one is made and shown on the finish page)
 //   platform=<name>     recruitment platform, stored with the data (e.g. microworkers)
@@ -377,6 +378,7 @@ function buildTimeline(design) {
         on_finish: markHidden
     });
     timeline.push(save_data_block);
+    var tasks_start = timeline.length;
 
     // --- Task A and Task B trials, with the attention checks between them
     var bws_blocks = bws_trials.map(function(items, t) {
@@ -503,6 +505,9 @@ function buildTimeline(design) {
     if (debug) {
         console.log('BWS version', bws_version, 'A/B plan', pair_plan, 'comprehension', comprehension_plan,
                     'attention before trials', slots);
+    }
+    if (debug && getUrlParameter('skip_to') === 'tasks') {
+        timeline.splice(2, tasks_start - 2);  // keep the preload and full screen
     }
     return timeline;
 }

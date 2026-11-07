@@ -688,8 +688,16 @@ def render_clip(geometry: Geometry, clip_video: Path, style: Style, out_path: Pa
     return render_variants(geometry, clip_video, [(out_path.stem, style)], out_path.parent, start_s, duration_s, scene)
 
 
-def encode_h264(src: Path, dst: Path) -> None:
+# Delivered clips: drawn at the geometry's size (1280x720), sent at 960x540. Two clips play
+# side by side at about 600 px each, so nothing is lost, and a participant loads about a third
+# of the data (~35 MB instead of ~100 MB), which matters on slow connections.
+STIMULUS_WIDTH = 960
+STIMULUS_CRF = 30
+
+
+def encode_h264(src: Path, dst: Path, width: int = STIMULUS_WIDTH, crf: int = STIMULUS_CRF) -> None:
     if shutil.which("ffmpeg") is None:
         raise RuntimeError("ffmpeg is needed to encode H.264, which browsers require")
-    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", str(src), "-c:v", "libx264", "-pix_fmt", "yuv420p",
-                    "-crf", "26", "-movflags", "+faststart", "-an", str(dst)], check=True)
+    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", str(src), "-vf", f"scale={width}:-2",
+                    "-c:v", "libx264", "-preset", "slow", "-pix_fmt", "yuv420p", "-crf", str(crf),
+                    "-movflags", "+faststart", "-an", str(dst)], check=True)

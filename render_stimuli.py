@@ -5,6 +5,7 @@
     uv run python render_stimuli.py --check                     # flag pairs that barely differ in a scene
     uv run python render_stimuli.py                             # all clips -> public/stimuli/
     uv run python render_stimuli.py --scene pedestrian_crossing --property path_width
+    uv run python render_stimuli.py --reencode                  # shrink clips rendered at full size
 
 Every clip of a scene starts from the baseline display in study/properties.json; the
 low and high clip of a property change only that property's settings (its ``render``
@@ -22,7 +23,8 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from avprops.clip_render import ClipRenderer, Style, read_frames, read_geometry, render_variants, path_on_ground
+from avprops.clip_render import (STIMULUS_WIDTH, ClipRenderer, Style, encode_h264, read_frames, read_geometry,
+                                 render_variants, path_on_ground)
 from avprops.common import load_config, load_properties, load_scenes, resolve, PROJECT_ROOT
 
 TIMING_KEYS = {"show_when", "lead_time_s", "fade_s"}
@@ -147,6 +149,29 @@ def check(scene: dict, geometry, styles: list[tuple[str, Style]], step_s: float 
 PREVIEW_DIR = PROJECT_ROOT / "public" / "stimuli" / "previews"
 
 
+def reencode(root: Path, workers: int = 4) -> None:
+    """Encode clips rendered before the delivered size was reduced (clip_render.STIMULUS_WIDTH)
+    at that size, in place. The previews are left as they are (already small)."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    def width(path: Path) -> int:
+        out = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width",
+                              "-of", "csv=p=0", str(path)], capture_output=True, text=True, check=True)
+        return int(out.stdout.strip())
+
+    clips = [p for p in sorted(root.glob("*/*.mp4")) if p.parent.name != "previews" and width(p) > STIMULUS_WIDTH]
+
+    def one(path: Path) -> None:
+        tmp = path.with_suffix(".small.mp4")
+        encode_h264(path, tmp)
+        tmp.replace(path)
+
+    with ThreadPoolExecutor(workers) as pool:
+        for k, _ in enumerate(pool.map(one, clips), 1):
+            if k % 50 == 0 or k == len(clips):
+                print(f"{k}/{len(clips)} clips re-encoded", flush=True)
+
+
 def build_previews(properties: list[dict], checked: dict) -> list[str]:
     """A 5 s looping example per property for the ranking screens: its low and high clip
     side by side (2 x 2 for a property with three variants), from the scene where the pair
@@ -196,7 +221,12 @@ def main() -> None:
                         help="build the ranking screens' example videos from the rendered clips")
     parser.add_argument("--check", action="store_true",
                         help="report how much each pair differs in each scene, without rendering videos")
+    parser.add_argument("--reencode", action="store_true",
+                        help="re-encode rendered clips wider than the delivered size, without rendering again")
     args = parser.parse_args()
+    if args.reencode:
+        reencode(PROJECT_ROOT / "public" / "stimuli")
+        return
 
     config = load_config()
     props = load_properties(config, screened_only=not args.reserves and not args.property)

@@ -39,3 +39,8 @@ body {
 .code { font-family: ui-monospace, Menlo, monospace; font-size: 22px; padding: 8px 12px; background: #f1f3f4; border-radius: 6px; user-select: all; }
 
 .questions select { font: inherit; padding: 6px 8px; min-width: 320px; }
+
+/* information sheet on the consent page */
+.info-sheet { text-align: left; max-width: 760px; margin: 0 auto; font-size: 0.95em; }
+.info-sheet p { margin: 0.6em 0; }
+.consent-list { text-align: left; max-width: 760px; margin: 0.4em auto; }

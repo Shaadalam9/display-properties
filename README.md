@@ -9,11 +9,11 @@ The code implements the study design: a literature review gives the candidate pr
 measures which of them matter and which people disagree about, and pre-registered rules select the final set. The
 crowdsourcing setup follows
 [bazilinskyy/ehmi-vehicles](https://github.com/bazilinskyy/ehmi-vehicles): a [jsPsych](https://www.jspsych.org) 8
-experiment served by Node.js (Express) and stored in MongoDB, deployed on Heroku, with the analysis in Python.
+experiment served by Node.js (Express) from a TU/e server, with the analysis in Python.
 
 ## Experiment
-The experiment is in `public/views/experiment.html` and `public/js/experiment.js`. `app.js` serves it and stores the
-data in the `entries` collection of a MongoDB database. jsPsych and its plugins are installed from npm and served by
+The experiment is in `public/views/experiment.html` and `public/js/experiment.js`. `app.js` serves it and the video stimuli,
+and stores the data in a JSON lines file on the server (or, with `CONNECTION` set, in a MongoDB database). jsPsych and its plugins are installed from npm and served by
 `app.js`.
 
 ### Procedure
@@ -137,22 +137,35 @@ attention settings.
 ### Running the experiment
 Install the dependencies with `npm install` and start the server with
 `CONNECTION='<MongoDB connection string>' npm start`, then open http://localhost:3000. Without `CONNECTION` the server
-stores the data in `data/entries.jsonl`, in the same shape as a MongoDB export, so the study can be tried without a
-database. URL parameters:
+stores the data in `data/entries.jsonl` (or the file named by `DATA_FILE`), in the same shape as a MongoDB export. URL parameters:
 * `debug=true`: log details to the browser console, skip the device check, allow continuing before a video ends, show
   the names of missing clips, and mark the data as debug (excluded from the analysis).
 * `save_data=false`: do not send data to the server.
 * `worker_code=<code>`: participant code to store with the data and show on the finish page. `PROLIFIC_PID` is used
-  when present; otherwise a code is generated.
+  when present; otherwise a random 14-character code is made.
+* `platform=<name>`: recruitment platform, stored with the data (e.g. `platform=microworkers`).
 
-**Sample.** To compare regions, recruit separate groups per region with the platform's screening (on Prolific:
-the "Current country of residence" prescreener, one study per region with its own quota) and keep the groups
-roughly equal, rather than relying on whoever signs up. Prolific's pool is mostly Europe and North America;
-regions where it has few participants, such as Egypt, may need another crowdsourcing platform, using the same
-`worker_code` link.
+**Recruitment on Microworkers.** Give the campaign the link `https://<server>/?platform=microworkers` and ask for
+the completion code as proof. The link carries no worker ID: every participant gets a random code, which the finish
+page shows (and the attention-fail page too, for the partial payment). Only Microworkers can link a code to a worker.
+To approve submissions:
 
-The live study runs on Heroku (`Procfile`, Node.js 22), with the connection string set as the `CONNECTION` config
-variable.
+```bash
+uv run python payments.py --data /srv/study-data/entries.jsonl --check CODE1 CODE2 ...
+```
+
+`payments.csv` lists every code as `full` (reached the end), `partial` (stopped by the attention checks) or `none`,
+with a `review` column of quality flags (answered too fast, same IP address as an earlier participant) for the
+researcher to decide on by hand; no payment is refused automatically. Delete `payments.csv` once everyone is paid.
+
+**Sample.** To compare regions, run one campaign per region with the platform's country targeting and its own quota,
+and keep the groups roughly equal, rather than relying on whoever signs up. Leave out countries where the data may
+not be processed (see the data management plan).
+
+The live study runs on a TU/e-managed virtual server, so that no participant data goes to an outside hosting,
+database or video service: `app.js` serves the experiment and the clips, writes the responses to `DATA_FILE` on TU/e
+storage, and nginx in front keeps no access log. `deploy/` has the setup (systemd unit, nginx configuration, steps).
+The `Procfile` and `CONNECTION` remain for running it on Heroku with MongoDB, as in ehmi-vehicles.
 
 ## Analysis
 The analysis is in the `avprops` package, started by `analysis.py`. Tested with Python 3.12.13 and
@@ -182,7 +195,9 @@ from `default.config` and `default.secret`. If there is no `config`, `default.co
   of `colour_dependent` properties (they are still compared in `subgroups.csv`).
 * Exclusions: `exclude_debug`, `exclude_unfinished`, `attention_max_wrong`, `min_median_bws_rt_ms`,
   `min_repeat_consistency` (0 = report consistency only),
-  `max_hidden_ab_share` (share of A/B pairs during which the participant left the page).
+  `max_hidden_ab_share` (share of A/B pairs during which the participant left the page), `exclude_duplicate_ip`
+  (keep only the first participant from each IP address, as in Bazilinskyy et al., 2022,
+  https://doi.org/10.54941/ahfe1002444).
 * Selection rules: `select_n` (4), `noticed_min_share` (0.70), `matters_top_fraction` (0.5),
   `disagreement_max_majority_share` (0.75), `redundancy_min_abs_r` (0.70). Set them in the pilot, then pre-register.
 
@@ -196,7 +211,8 @@ from `default.config` and `default.secret`. If there is no `config`, `default.co
 
 Outputs go to `_output/` (not in git, as they hold personal data):
 * `participants.csv`: every participant: finished, attention answers, questionnaire scores, repeat consistency,
-  whether they preferred no display, comprehension, excluded and why.
+  whether they preferred no display, comprehension, excluded and why. IP addresses appear only as placeholders
+  (0.0.0.1, 0.0.0.2, ...), the same one for the same address.
 * `summary.csv`: per property the BWS score with bootstrap CI, share noticing, preference split, importance, rating
   differences with Wilcoxon tests, comprehension after the low vs the high clip (Fisher's exact test), the
   correlation of choosing the high level with each questionnaire score, and its status. Repeated pairs and the
@@ -207,6 +223,10 @@ Outputs go to `_output/` (not in git, as they hold personal data):
 * `redundant.csv`, `open_answers.csv` (for thematic coding of Task C) and `report.md`, which also gives the overall
   repeat consistency, the share of participants who preferred no display, the countries of residence and the
   subgroup differences.
+
+**Publishing the data.** `uv run python export_public.py --data <file> --out _output/public` writes the anonymised
+dataset: new random participant numbers instead of the codes, no IP addresses, age in bands, and the open answers in
+a separate file to redact by hand before publishing (`avprops/publish.py`).
 
 Every property gets a status saying where it stopped: `not noticed`, `does not matter`, `consensus: fix at low/high`,
 `redundant with …`, `eligible, below cut-off`, or `selected`.

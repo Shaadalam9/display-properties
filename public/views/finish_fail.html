@@ -9,7 +9,13 @@
     <div class="finish">
       <h1>Too many incorrect answers</h1>
       <p>Unfortunately, you answered too many of the screening questions incorrectly and are not able to continue with this study.</p>
-      <p>Thank you for your time. You may now close this tab.</p>
+      <p>You will receive a partial payment for the time you spent. Your code is:</p>
+      <p><span id="code" class="code"></span></p>
+      <p>Copy this code into the crowdsourcing platform, then close this tab. Thank you for your time.</p>
     </div>
+    <script>
+      var code = new URLSearchParams(window.location.search).get('work') || '';
+      document.getElementById('code').textContent = code;
+    </script>
   </body>
 </html>

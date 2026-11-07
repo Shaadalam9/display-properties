@@ -1,0 +1,19 @@
+# systemd unit for the study on a TU/e virtual server (see deploy/README.md).
+# Copy to /etc/systemd/system/, adjust the paths and user, then:
+#   sudo systemctl daemon-reload && sudo systemctl enable --now display-properties
+
+[Unit]
+Description=display-properties online study
+After=network.target
+
+[Service]
+User=study
+WorkingDirectory=/opt/display-properties
+# responses are appended here; put it on TU/e storage that is backed up
+Environment=DATA_FILE=/srv/study-data/entries.jsonl
+Environment=PORT=3000
+ExecStart=/usr/bin/node app.js
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

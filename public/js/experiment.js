@@ -14,7 +14,13 @@
 //                       before a video ends, and mark every row debug = true
 //   save_data=false     do not send data to the server
 //   worker_code=<code>  code of the participant (PROLIFIC_PID is used when present;
-//                       otherwise one is generated and shown on the finish page)
+//                       otherwise a random one is made and shown on the finish page)
+//   platform=<name>     recruitment platform, stored with the data (e.g. microworkers)
+//
+// On Microworkers the link carries no worker ID: each participant gets a random code, shows
+// it as the completion code at the end (also after failing the attention checks, for the
+// partial payment) and pastes it into Microworkers as proof. payments.py lists every code
+// with what it earns, so the study's data never holds the Microworkers ID.
 'use strict';
 
 var SAVE_DATA = true;  // save data or not
@@ -27,15 +33,18 @@ var debug = /^true$/i.test(getUrlParameter('debug') || '');
 var save_data = getUrlParameter('save_data') === null ? SAVE_DATA : /^true$/i.test(getUrlParameter('save_data'));
 
 /**
- * Code of the participant: worker_code or PROLIFIC_PID from the URL, or a new one.
+ * Code of the participant: worker_code or PROLIFIC_PID from the URL, or a new random one
+ * that cannot be guessed (it is the completion code that earns the payment).
  */
 function getWorkerCode() {
     var code = getUrlParameter('worker_code') || getUrlParameter('PROLIFIC_PID');
     if (code && /^[A-Za-z0-9_-]{1,64}$/.test(code)) {
         return code;
     }
-    var random_num = Math.floor(Math.random() * 10000);
-    return 'AV' + Date.now() + 'D' + random_num;
+    var alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';  // no 0/O, 1/I: easy to copy by hand
+    var bytes = new Uint8Array(12);
+    window.crypto.getRandomValues(bytes);
+    return 'AV' + Array.from(bytes, function(b) { return alphabet[b % alphabet.length]; }).join('');
 }
 var worker_code = getWorkerCode();
 if (debug) {
@@ -146,6 +155,7 @@ function buildTimeline(design) {
         study_id: design.study_id,
         design_generated_at: design.generated_at,
         debug: debug,
+        platform: getUrlParameter('platform') || (getUrlParameter('PROLIFIC_PID') ? 'prolific' : ''),
         prolific_study_id: getUrlParameter('STUDY_ID') || '',
         prolific_session_id: getUrlParameter('SESSION_ID') || ''
     });
@@ -303,7 +313,7 @@ function buildTimeline(design) {
             { prompt: 'How much experience do you have with driver-assistance or self-driving features?', name: 'automation_experience', options: ['None', 'A little', 'Some', 'A lot'], required: true },
             { prompt: 'Have you ever ridden in a car that drives itself?', name: 'av_ride', options: ['Yes', 'No'], required: true },
             { prompt: 'How familiar are you with head-up or augmented-reality displays in cars?', name: 'ar_familiarity', options: ['Not at all', 'Slightly', 'Moderately', 'Very'], required: true },
-            { prompt: 'Do you have any form of colour vision deficiency (colour blindness)?', name: 'colour_vision_deficiency', options: ['Yes', 'No', 'Not sure'], required: true }
+            { prompt: 'Do you have any form of colour vision deficiency (colour blindness)?', name: 'colour_vision_deficiency', options: ['Yes', 'No', 'Not sure', 'Prefer not to say'], required: true }
         ],
         data: { task: 'demographics' }
     });
@@ -463,7 +473,7 @@ function buildTimeline(design) {
                     if (debug) console.log('wrong attention answer, total', attention_wrong);
                     if (attention_wrong >= design.attention_fail_at) {
                         excluded = true;
-                        saveData(function() { window.location = 'finish_fail'; });
+                        saveData(function() { window.location = 'finish_fail?work=' + encodeURIComponent(worker_code); });
                     }
                 }
             }

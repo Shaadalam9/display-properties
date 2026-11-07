@@ -37,16 +37,28 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
+from avprops.crowd import mask_ips
+
 RATING_KEYS = ("understanding", "safety", "load")
 
 
 def apply_exclusions(records: list[dict], config: dict) -> tuple[list[dict], pd.DataFrame]:
     """Return the kept records and a table of every participant with the reason excluded."""
     kept, rows = [], []
+    # a later participant from an address already seen took part twice (or shares a device):
+    # keep the first one only; debug sessions do not count
+    later_same_ip, seen = set(), set()
+    for rec in sorted(records, key=lambda r: r.get("arrival", 0)):
+        if rec.get("ip") and not rec.get("debug"):
+            if rec["ip"] in seen:
+                later_same_ip.add(id(rec))
+            seen.add(rec["ip"])
     for rec in records:
         reasons = []
         if config["exclude_debug"] and rec.get("debug"):
             reasons.append("debug session")
+        if config.get("exclude_duplicate_ip", True) and id(rec) in later_same_ip:
+            reasons.append("same IP address as an earlier participant")
         if config["exclude_unfinished"] and rec.get("finished") is False:
             reasons.append("did not finish")
         attention = rec.get("attention") or {}
@@ -342,6 +354,7 @@ def analyse(records: list[dict], properties: list[dict], config: dict,
     questionnaires = questionnaires or []
     prop_ids = [p["id"] for p in properties]
     kept, exclusions = apply_exclusions(records, config)
+    mask_ips(records)  # the addresses are not needed after the exclusions; no output holds them
     individual = bws_individual(kept, prop_ids)
     summary = bws_summary(individual, config["bootstrap_samples"], config["bootstrap_seed"])
     skip_cvd = ({p["id"] for p in properties if p.get("colour_dependent")}
@@ -353,7 +366,7 @@ def analyse(records: list[dict], properties: list[dict], config: dict,
     redundant = redundant_pairs(individual, config["redundancy_min_abs_r"])
     summary = select_properties(summary, redundant, config)
     participants = pd.DataFrame([{
-        "pid": r["pid"], "finished": r.get("finished"), "debug": r.get("debug"),
+        "pid": r["pid"], "ip": r.get("ip"), "finished": r.get("finished"), "debug": r.get("debug"),
         "attention_wrong": (r.get("attention") or {}).get("wrong"),
         "bws_trials": len(r.get("bws", [])), "ab_pairs": len(first_pairs(r)),
         "repeat_consistency": repeat_consistency(r), "prefers_no_display": prefers_no_display(r),

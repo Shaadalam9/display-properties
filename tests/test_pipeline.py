@@ -185,3 +185,48 @@ def test_subgroups_find_colour_vision_and_criticality_effects(config, design):
         counted = sum(1 for r in records if r["pid"] in kept - cvd for p in r["ab"]
                       if p["property"] == prop and not p["repeat"])
         assert result["summary"].loc[prop, "ab_n"] == counted
+
+
+def test_duplicate_ip_keeps_the_first_and_is_masked(config, design, tmp_path):
+    documents, _ = simulate(design, n=6, seed=8)
+    for k, doc in enumerate(documents):
+        doc["ip"] = f"203.0.113.{k}"
+    documents[4]["ip"] = documents[1]["ip"]           # participant 4 took part again from 1's address
+    path = tmp_path / "entries.jsonl"
+    path.write_text("\n".join(json.dumps(d) for d in documents) + "\n")
+    records = rows_to_records(read_rows([path]), config["attention_max_wrong"])
+    result = analyse(records, load_properties(config), config)
+    reasons = result["exclusions"].set_index("pid")["reasons"]
+    assert "same IP address" in reasons["sim0004"] and "same IP address" not in reasons["sim0001"]
+    ips = result["participants"].set_index("pid")["ip"]
+    assert ips["sim0004"] == ips["sim0001"] and all(ip.startswith("0.0.0.") for ip in ips)
+    assert "203.0.113" not in result["participants"].to_csv()
+
+
+def test_public_export_has_no_codes_ips_or_exact_ages(config, design, tmp_path):
+    from avprops.publish import anonymise
+    documents, _ = simulate(design, n=5, seed=9)
+    for k, doc in enumerate(documents):
+        doc["ip"] = f"203.0.113.{k}"
+    path = tmp_path / "entries.jsonl"
+    path.write_text("\n".join(json.dumps(d) for d in documents) + "\n")
+    records = rows_to_records(read_rows([path]), config["attention_max_wrong"])
+    tables = anonymise(records, seed=1)
+    text = "".join(t.to_csv() for t in tables.values())
+    assert "sim000" not in text and "203.0.113" not in text
+    people = tables["participants"]
+    assert sorted(people["participant"]) == [f"P{k:04d}" for k in range(1, 6)]
+    assert "age" not in people and people["age_band"].str.match(r"^\d+(-\d+|\+)$").all()
+    assert len(tables["ab"]) and len(tables["bws"])
+
+
+def test_payment_status(config, design):
+    from payments import payments
+    documents, _ = simulate(design, n=3, seed=10)
+    for row in documents[0]["data"]:
+        if row["task"] == "attention":
+            row["correct"] = False
+    documents[0]["data"] = [r for r in documents[0]["data"] if r["task"] != "final"]
+    documents[1]["data"] = [r for r in documents[1]["data"] if r["task"] not in ("final", "attention")]
+    status = payments(records_from(documents, config), config).set_index("code")["status"]
+    assert status.to_dict() == {"sim0000": "partial", "sim0001": "none", "sim0002": "full"}

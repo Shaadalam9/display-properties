@@ -4,9 +4,16 @@
 //
 //   CONNECTION='<MongoDB connection string>' npm start      -> http://localhost:3000
 //
-// Without CONNECTION the rows are appended to data/entries.jsonl instead, in the same
-// shape as a mongoexport of `entries`, so the study can be tried without a database.
+// Without CONNECTION the rows are appended to a JSON lines file instead (DATA_FILE, default
+// data/entries.jsonl), in the same shape as a mongoexport of `entries`. This is how the study
+// runs on a TU/e server: DATA_FILE points to TU/e storage, the video stimuli are served from
+// public/stimuli/ by this server too, and no data goes to an outside service (deploy/).
 // On Heroku, set CONNECTION as a config variable; the Procfile starts this file.
+//
+// Each stored batch carries the participant's IP address (`ip`), only to find people who take
+// part more than once; the analysis keeps each address's first participant and replaces the
+// addresses with placeholders, so no output holds them (avprops/crowd.py). The server keeps
+// no request log.
 
 const fs = require('fs');
 const path = require('path');
@@ -15,7 +22,7 @@ const mongoose = require('mongoose');
 
 const ROOT = __dirname;
 const PUBLIC = path.join(ROOT, 'public');
-const LOCAL_FILE = path.join(ROOT, 'data', 'entries.jsonl');
+const LOCAL_FILE = path.resolve(ROOT, process.env.DATA_FILE || path.join('data', 'entries.jsonl'));
 
 // jsPsych and the plugins come from npm (versions pinned in package-lock.json).
 const JSPSYCH_PLUGINS = [
@@ -34,20 +41,22 @@ if (process.env.CONNECTION) {
         });
     Entry = mongoose.model('Entry', new mongoose.Schema({}, { strict: false }));
 } else {
-    console.warn('CONNECTION is not set: storing data in ' + path.relative(ROOT, LOCAL_FILE));
+    console.log('CONNECTION is not set: storing data in ' + LOCAL_FILE);
     fs.mkdirSync(path.dirname(LOCAL_FILE), { recursive: true });
 }
 
-async function storeRows(rows) {
+async function storeRows(rows, ip) {
     if (Entry) {
-        await Entry.create({ data: rows });
+        await Entry.create({ data: rows, ip: ip });
     } else {
-        await fs.promises.appendFile(LOCAL_FILE, JSON.stringify({ data: rows }) + '\n');
+        await fs.promises.appendFile(LOCAL_FILE, JSON.stringify({ data: rows, ip: ip }) + '\n');
     }
 }
 
 // --- APP
 const app = express();
+// behind nginx on the same machine: take the participant's address from X-Forwarded-For
+app.set('trust proxy', 'loopback');
 app.use(express.json({ limit: '10mb' }));
 
 const file = (relative) => (request, response) => response.sendFile(path.join(ROOT, relative));
@@ -56,6 +65,9 @@ app.get('/jspsych/jspsych.css', file('node_modules/jspsych/css/jspsych.css'));
 for (const name of JSPSYCH_PLUGINS) {
     app.get(`/jspsych/plugin-${name}.js`, file(`node_modules/@jspsych/plugin-${name}/dist/index.browser.min.js`));
 }
+// clips are cached by the browser, so a pair shown again (the repeats) is not downloaded twice;
+// express.static answers range requests, which video players use to stream
+app.use('/stimuli', express.static(path.join(PUBLIC, 'stimuli'), { index: false, maxAge: '1d', immutable: true }));
 app.use(express.static(PUBLIC, { index: false }));
 
 // --- ROUTING
@@ -72,7 +84,7 @@ app.post('/experiment-data', async (request, response) => {
         return;
     }
     try {
-        await storeRows(rows);
+        await storeRows(rows, request.ip);
         response.end();
     } catch (err) {
         console.error('could not store data', err);

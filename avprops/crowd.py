@@ -7,6 +7,12 @@ the same shape, one document per line, or a JSON array with ``--jsonArray``.
 
 Rows are grouped by ``worker_code``; a row sent twice is kept once. Every row carries a
 ``task`` field set in public/js/experiment.js, which decides how it is read.
+
+Each document also holds the participant's IP address (``ip``), added by the server. It is
+only used to find people who took part more than once (analysis.apply_exclusions keeps the
+first participant of each address), after which ``mask_ips`` replaces the addresses with
+placeholders (0.0.0.1, 0.0.0.2, ...), as in bazilinskyy/text-crowdsourced, so that no
+output holds them.
 """
 
 from __future__ import annotations
@@ -33,8 +39,19 @@ def read_rows(paths: Iterable[Path]) -> list[dict]:
     for path in paths:
         for doc in read_documents(path):
             data = doc.get("data", [])
-            rows.extend(data if isinstance(data, list) else [data])
+            ip = doc.get("ip")
+            for row in data if isinstance(data, list) else [data]:
+                rows.append(dict(row, ip=ip) if ip and "ip" not in row else row)
     return rows
+
+
+def mask_ips(records: list[dict]) -> None:
+    """Replace each IP address by a placeholder, the same one for the same address, numbered
+    in order of arrival."""
+    masked: dict[str, str] = {}
+    for rec in sorted(records, key=lambda r: r.get("arrival", 0)):
+        if rec.get("ip"):
+            rec["ip"] = masked.setdefault(rec["ip"], f"0.0.0.{len(masked) + 1}")
 
 
 def download(uri: str, out: Path) -> None:
@@ -55,11 +72,13 @@ def _rt(row: dict) -> int | None:
 def rows_to_records(rows: list[dict], attention_max_wrong: int) -> list[dict[str, Any]]:
     """Group jsPsych rows by participant into the record format the analysis reads."""
     by_worker: dict[str, dict[int, dict]] = {}
+    arrival: dict[str, int] = {}  # order in which participants' first rows reached the server
     for row in rows:
         code = row.get("worker_code")
         if code is None or row.get("trial_index") is None:
             continue
         by_worker.setdefault(code, {})[int(row["trial_index"])] = row
+        arrival.setdefault(code, len(arrival))
 
     records = []
     for code, indexed in by_worker.items():
@@ -67,9 +86,12 @@ def rows_to_records(rows: list[dict], attention_max_wrong: int) -> list[dict[str
         first = trials[0]
         record: dict[str, Any] = {
             "pid": code,
+            "arrival": arrival[code],
+            "ip": next((t["ip"] for t in trials if t.get("ip")), None),
             "study_id": first.get("study_id"),
             "design_generated_at": first.get("design_generated_at"),
             "debug": any(bool(t.get("debug")) for t in trials),
+            "platform": first.get("platform", ""),
             "prolific_study_id": first.get("prolific_study_id", ""),
             "prolific_session_id": first.get("prolific_session_id", ""),
             "consent": False,

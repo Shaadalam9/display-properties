@@ -45,44 +45,76 @@ flowchart LR
 ## The properties
 
 `study/properties.json` lists every candidate property with its source, its levels and why it was screened in or out.
-The 17 screened in:
+These are the 17 configurations the study checks. Each one is a single setting of the display; its two clips
+(low and high) differ only in that setting, everything else stays at the default. The clips below are the ones
+participants see next to each property on the ranking screens; in the A/B pairs they see the two levels as full
+videos instead.
 
-| Element | Property | Low | High |
-|---|---|---|---|
-| Planned path | Path visibility (`trajectory_alpha`) | Faint | Solid |
-| Planned path | Path width (`path_width`) | Thin line | Car-wide band |
-| Planned path | Path length (`path_length`) | Short (about 8 m) | Long (about 35 m) |
-| Planned path | Path style (`path_style`) | Plain band | Flowing arrows |
-| Planned path | Path certainty colour (`path_uncertainty`) | One colour | Colour changes with distance |
-| Planned manoeuvre | Manoeuvre cue (`manoeuvre_cue`) | None | Icon and text, e.g. "Turning left" |
-| Road users | Highlight strength (`mask_alpha`) | Subtle | Strong |
-| Road users | Which road users are highlighted (`highlight_scope`) | Only those the car reacts to | All detected |
-| Road users | Highlight style (`highlight_style`) | Outline | Filled shape |
-| Road users | Colour by road-user type (`class_colours`) | One colour for all | Different colour per type |
-| Road users | Pedestrian marker size (`marker_size`) | Small | Large |
-| Road users | Other road users' paths (`predicted_paths`) | Off | On |
-| Text | Explanation detail (`explanation_detail`) | None | e.g. "Stopping: pedestrians crossing" |
-| Timing | When the display is shown (`show_when`) | Only around the event | Always |
-| Vehicle state | Confidence indicator (`confidence_indicator`) | None | Confidence bar |
-| Context | Background dimming (`background_dim_alpha`) | None | Strong |
-| Colour | Colour palette (`palette_id`) | Standard | Okabe-Ito, minimalist HUD or high saliency |
+**Planned path**
 
-The set includes the four parameters of the follow-up preference study (highlight strength, path visibility,
-background dimming and colour palette) with the same ranges and defaults, so that study's choice of parameters can be
-checked against what participants rank here. Distance labels, a status panel and the panel position are kept as
-reserves; placement, audio, on-demand display, explanation timing, path shape and text size are fixed or excluded,
-with the reason in `properties.json`.
+| Property | What changes | Low (left) vs high (right) |
+|---|---|---|
+| **Path visibility**<br>`trajectory_alpha` | How strongly the car's planned path is drawn on the road.<br><br>Low: Faint<br>High: Solid | <img src="docs/figures/properties/trajectory_alpha.gif" width="420" alt="Path visibility: Faint vs Solid"> |
+| **Path width**<br>`path_width` | How wide the planned path is drawn.<br><br>Low: Thin line<br>High: Car-wide band | <img src="docs/figures/properties/path_width.gif" width="420" alt="Path width: Thin line vs Car-wide band"> |
+| **Path length**<br>`path_length` | How far ahead the planned path is shown.<br><br>Low: Short (about 8 m)<br>High: Long (about 35 m) | <img src="docs/figures/properties/path_length.gif" width="420" alt="Path length: Short (about 8 m) vs Long (about 35 m)"> |
+| **Path style**<br>`path_style` | Whether the path is a plain band or carries arrows that flow forward.<br><br>Low: Plain band<br>High: Flowing arrows | <img src="docs/figures/properties/path_style.gif" width="420" alt="Path style: Plain band vs Flowing arrows"> |
+| **Path certainty colour**<br>`path_uncertainty` | Whether the path changes colour further ahead, where the car is less certain.<br><br>Low: One colour<br>High: Colour changes with distance | <img src="docs/figures/properties/path_uncertainty.gif" width="420" alt="Path certainty colour: One colour vs Colour changes with distance"> |
 
-<p align="center">
-  <img src="docs/figures/properties.jpg" alt="Every property at its low and high level, each in the scene where the two differ most">
-  <br><em>Every property at its low (left) and high (right) level, in the scene where the two clips differ most.</em>
-</p>
+**Planned manoeuvre**
 
-The palette has three alternatives to the standard one; each participant sees one of them, at random:
+| Property | What changes | Low (left) vs high (right) |
+|---|---|---|
+| **Manoeuvre cue**<br>`manoeuvre_cue` | An icon and short text naming the car's next manoeuvre.<br><br>Low: None<br>High: Icon and text, e.g. 'Turning left' | <img src="docs/figures/properties/manoeuvre_cue.gif" width="420" alt="Manoeuvre cue: None vs Icon and text, e.g. 'Turning left'"> |
 
-<p align="center">
-  <img src="docs/figures/palettes.jpg" alt="The four colour palettes in the same frame">
-</p>
+**Road users**
+
+| Property | What changes | Low (left) vs high (right) |
+|---|---|---|
+| **Highlight strength**<br>`mask_alpha` | How strongly the road users the car reacts to are highlighted.<br><br>Low: Subtle<br>High: Strong | <img src="docs/figures/properties/mask_alpha.gif" width="420" alt="Highlight strength: Subtle vs Strong"> |
+| **Which road users are highlighted**<br>`highlight_scope` | Only the road users the car reacts to, or every road user it detects.<br><br>Low: Only those the car reacts to<br>High: All detected | <img src="docs/figures/properties/highlight_scope.gif" width="420" alt="Which road users are highlighted: Only those the car reacts to vs All detected"> |
+| **Highlight style**<br>`highlight_style` | How the road users are marked.<br><br>Low: Outline<br>High: Filled shape | <img src="docs/figures/properties/highlight_style.gif" width="420" alt="Highlight style: Outline vs Filled shape"> |
+| **Colour by road-user type**<br>`class_colours` | Whether pedestrians and vehicles are highlighted in different colours.<br><br>Low: One colour for all<br>High: Different colour per type | <img src="docs/figures/properties/class_colours.gif" width="420" alt="Colour by road-user type: One colour for all vs Different colour per type"> |
+| **Pedestrian marker size**<br>`marker_size` | Size of the marker above pedestrians.<br><br>Low: Small<br>High: Large | <img src="docs/figures/properties/marker_size.gif" width="420" alt="Pedestrian marker size: Small vs Large"> |
+| **Other road users' paths**<br>`predicted_paths` | Lines showing where moving road users are heading.<br><br>Low: Off<br>High: On | <img src="docs/figures/properties/predicted_paths.gif" width="420" alt="Other road users' paths: Off vs On"> |
+
+**Text**
+
+| Property | What changes | Low (left) vs high (right) |
+|---|---|---|
+| **Explanation detail**<br>`explanation_detail` | How much the display says about why the car acts.<br><br>Low: None<br>High: e.g. 'Stopping: pedestrians crossing' | <img src="docs/figures/properties/explanation_detail.gif" width="420" alt="Explanation detail: None vs e.g. 'Stopping: pedestrians crossing'"> |
+
+**Timing**
+
+| Property | What changes | Low (left) vs high (right) |
+|---|---|---|
+| **When the display is shown**<br>`show_when` | Only around the event, or for the whole drive.<br><br>Low: Only around the event<br>High: Always | <img src="docs/figures/properties/show_when.gif" width="420" alt="When the display is shown: Only around the event vs Always"> |
+
+**Vehicle state**
+
+| Property | What changes | Low (left) vs high (right) |
+|---|---|---|
+| **Confidence indicator**<br>`confidence_indicator` | A bar showing how confident the car is about what it sees.<br><br>Low: None<br>High: Confidence bar | <img src="docs/figures/properties/confidence_indicator.gif" width="420" alt="Confidence indicator: None vs Confidence bar"> |
+
+**Context**
+
+| Property | What changes | Low (left) vs high (right) |
+|---|---|---|
+| **Background dimming**<br>`background_dim_alpha` | How much the parts of the scene that do not matter are darkened.<br><br>Low: None<br>High: Strong | <img src="docs/figures/properties/background_dim_alpha.gif" width="420" alt="Background dimming: None vs Strong"> |
+
+**Colour**
+
+| Property | What changes | Low (left) vs high (right) |
+|---|---|---|
+| **Colour palette**<br>`palette_id` | The set of colours used for the whole display.<br><br>Low: Standard (yellow and cyan)<br>High: Another palette: colour-blind friendly, minimal, or high-contrast | <img src="docs/figures/properties/palette_id.gif" width="420" alt="Colour palette: Standard (yellow and cyan) vs Another palette: colour-blind friendly, minimal, or high-contrast"> |
+
+Four of these are the parameters of the follow-up preference study (highlight strength, path visibility, background
+dimming and colour palette), with the same ranges and defaults, so that study's choice of parameters can be checked
+against what participants rank here. The palette has three alternatives to the standard one; each participant sees
+one of them, at random.
+
+Not in the study: distance labels, a status panel and the panel position are kept as reserves; placement, audio,
+on-demand display, explanation timing, path shape and text size are fixed or excluded, with the reason in
+`properties.json`.
 
 ## The scenes
 
@@ -211,10 +243,29 @@ uv run python make_design.py                             # again, so the design 
 uv run python make_figures.py                            # the figures in this README
 ```
 
-Every scene gets, under `public/stimuli/<scene id>/`: `baseline.mp4`, `none.mp4` (no display), and
-`<property>_low.mp4` plus `<property>_high.mp4` (for the palette, one `palette_id_high_<variant>.mp4` per
-alternative). Clips are drawn at 1280 × 720 and delivered at 960 × 540 (about 35 MB per participant);
-`render_stimuli.py --reencode` shrinks clips rendered before that.
+**The rendered files.** `public/stimuli/` (not in git) has 20 folders: one per scene (19) and `previews/`.
+
+```
+public/stimuli/
+├── hanoi_risky/                         one folder per scene, 38 clips each
+│   ├── baseline.mp4                     the default display
+│   ├── none.mp4                         the same clip without a display
+│   ├── trajectory_alpha_low.mp4         low and high clip of each property
+│   ├── trajectory_alpha_high.mp4
+│   ├── ...                              (16 properties x 2)
+│   ├── palette_id_low.mp4               the standard palette
+│   ├── palette_id_high_okabe_ito.mp4    and its three alternatives
+│   ├── palette_id_high_minimalist_hud.mp4
+│   └── palette_id_high_high_saliency.mp4
+├── valencia_calm/ ... (18 more scenes)
+└── previews/                            17 short side-by-side clips for the ranking screens
+```
+
+Each scene folder holds 1 baseline + 1 no-display clip + 16 properties × 2 levels + the palette's 4 versions = 38
+clips, so every property can be shown in every scene. The study uses fewer: each property's A/B pair uses 4 scenes
+(below), so participants see 180 of the 722 clips, and only those are deployed. Clips are drawn at 1280 × 720 and
+delivered at 960 × 540 (about 35 MB per participant); `render_stimuli.py --reencode` shrinks clips rendered before
+that.
 
 **Which scenes a property uses.** A property can only differ in a scene that has what it acts on: other road users'
 paths need people moving sideways, colour by type needs vehicles, "when shown" needs an event with a few seconds

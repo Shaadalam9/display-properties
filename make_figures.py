@@ -6,8 +6,8 @@ Writes:
     display.gif      the default display in one scene
     preview.gif      a ranking-screen preview: one property at its two levels
     scenes.jpg       a frame of every scene, during its event
-    properties.jpg   every screened-in property at its low and high level
-    palettes.jpg     the four colour palettes
+    properties/<id>.gif  every property at its two levels side by side, labelled (from its
+                     ranking preview)
 
 The frames are small and low quality on purpose: they illustrate the stimuli, they are not
 the stimuli (the footage is third-party dashcam video, see the README).
@@ -48,12 +48,6 @@ def label(image: np.ndarray, text: str, height: int = 22) -> np.ndarray:
     return np.vstack([image, bar])
 
 
-def caption(width: int, text: str, height: int = 26) -> np.ndarray:
-    bar = np.full((height, width, 3), 255, np.uint8)
-    cv2.putText(bar, text, (6, height - 8), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (30, 30, 30), 1, cv2.LINE_AA)
-    return bar
-
-
 def grid(tiles: list[np.ndarray], cols: int, gap: int = 6) -> np.ndarray:
     h, w = tiles[0].shape[:2]
     rows = -(-len(tiles) // cols)
@@ -81,6 +75,44 @@ def gif(src: Path, dst: Path, start: float, duration: float, width: int, fps: in
                     "-filter_complex", graph, "-loop", "0", str(dst)], check=True)
 
 
+def property_gif(prop: dict, dst: Path, width: int = 480, fps: int = 6, seconds: float = 3.5) -> None:
+    """The property's ranking preview (low | high, or the four palettes 2 x 2) as a GIF, with
+    the level named under each tile."""
+    src = STIMULI / "previews" / f"{prop['id']}.mp4"
+    if prop.get("variants"):
+        names = ["low: standard"] + [f"high: {v.replace('_', ' ')}" for v in prop["variants"]]
+    else:
+        names = [f"low: {prop['low']}", f"high: {prop['high']}"]
+    cap = cv2.VideoCapture(str(src))
+    step = max(1, round((cap.get(cv2.CAP_PROP_FPS) or 30) / fps))
+    frames, k = [], 0
+    while len(frames) < seconds * fps:
+        ok, image = cap.read()
+        if not ok:
+            break
+        if k % step == 0:
+            frames.append(image)
+        k += 1
+    cap.release()
+    h, w = frames[0].shape[:2]
+    cols = 2
+    rows = len(names) // cols
+    tile_w, tile_h = width // cols, round(width / w * h) // rows
+    out = []
+    for image in frames:
+        image = cv2.resize(image, (tile_w * cols, tile_h * rows), interpolation=cv2.INTER_AREA)
+        tiles = [label(image[r * tile_h:(r + 1) * tile_h, c * tile_w:(c + 1) * tile_w], names[r * cols + c])
+                 for r in range(rows) for c in range(cols)]
+        out.append(grid(tiles, cols, gap=4))
+    tmp = dst.with_suffix(".mp4")
+    writer = cv2.VideoWriter(str(tmp), cv2.VideoWriter_fourcc(*"mp4v"), fps, (out[0].shape[1], out[0].shape[0]))
+    for image in out:
+        writer.write(image)
+    writer.release()
+    gif(tmp, dst, 0, seconds, out[0].shape[1], fps=fps)
+    tmp.unlink()
+
+
 def save(image: np.ndarray, name: str) -> None:
     cv2.imwrite(str(OUT / name), image, [cv2.IMWRITE_JPEG_QUALITY, 80])
     print(OUT / name)
@@ -103,29 +135,11 @@ def main() -> None:
     save(grid([label(frame(STIMULI / s["id"] / "baseline.mp4", event_time(s)), scene_name(s)) for s in rendered], 4),
          "scenes.jpg")
 
-    # every property, low | high, in the scene where its two clips differ most
-    checked = json.loads((PROJECT_ROOT / "data" / "stimulus_check.json").read_text())
-    pairs = []
+    # every property as a labelled GIF
+    (OUT / "properties").mkdir(exist_ok=True)
     for prop in design["properties"]:
-        allowed = design["ab"]["scenes"][prop["id"]]
-        scene = scenes[max(allowed, key=lambda s: checked.get(s, {}).get(prop["id"], {}).get("changed", 0))]
-        # "when shown" differs before the event (and its lead time): the display is off or already on
-        t = event_time(scene, -4.5) if prop["id"] == "show_when" else event_time(scene)
-        high = f"{prop['id']}_high_{prop['variants'][0]}" if prop.get("variants") else f"{prop['id']}_high"
-        low_img = label(frame(STIMULI / scene["id"] / f"{prop['id']}_low.mp4", t), f"low: {prop['low']}")
-        high_text = f"high: {prop['variants'][0].replace('_', '-')} palette (one of three)" if prop.get("variants") \
-            else f"high: {prop['high']}"
-        high_img = label(frame(STIMULI / scene["id"] / f"{high}.mp4", t), high_text)
-        pair = np.hstack([low_img, np.full((low_img.shape[0], 4, 3), 255, np.uint8), high_img])
-        pairs.append(np.vstack([caption(pair.shape[1], f"{prop['name']}  ({prop['id']}, {scene_name(scene)})"), pair]))
-    save(grid(pairs, 2, gap=10), "properties.jpg")
-
-    # the four palettes in one scene
-    scene = scenes["jaipur_risky"]
-    t = event_time(scene)
-    names = [("palette_id_low", "0 automotive standard"), ("palette_id_high_okabe_ito", "1 Okabe-Ito (accessible)"),
-             ("palette_id_high_minimalist_hud", "2 minimalist HUD"), ("palette_id_high_high_saliency", "3 high saliency")]
-    save(grid([label(frame(STIMULI / scene["id"] / f"{f}.mp4", t), text) for f, text in names], 4), "palettes.jpg")
+        property_gif(prop, OUT / "properties" / f"{prop['id']}.gif", width=560 if prop.get("variants") else 480)
+    print(OUT / "properties", "(17 GIFs)")
 
 
 if __name__ == "__main__":

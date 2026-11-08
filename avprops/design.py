@@ -87,6 +87,32 @@ def ab_scenes(properties: list[dict[str, Any]], scenes: list[dict[str, Any]],
     return allowed
 
 
+def limit_scenes(allowed: dict[str, list[str]], scenes: list[dict[str, Any]],
+                 checked: dict[str, dict[str, dict]] | None, k: int) -> dict[str, list[str]]:
+    """At most k scenes per property (0 = no limit), so fewer clips have to be hosted. The
+    scenes are picked one by one: first the one where the pair differs most, then each time
+    the scene that best balances calm and risky and adds a new country, ties broken by how
+    much the pair differs there."""
+    if not k:
+        return allowed
+    meta = {s["id"]: s for s in scenes}
+    changed = lambda p, s: (checked or {}).get(s, {}).get(p, {}).get("changed", 0.0)  # noqa: E731
+    limited = {}
+    for prop, ok in allowed.items():
+        chosen: list[str] = []
+        pool = sorted(ok, key=lambda s: -changed(prop, s))
+        while pool and len(chosen) < k:
+            risky = sum(meta[s].get("criticality") == "high" for s in chosen)
+            want_risky = risky <= len(chosen) - risky
+            countries = {meta[s].get("country") for s in chosen}
+            best = max(pool, key=lambda s: ((meta[s].get("criticality") == "high") == want_risky,
+                                           meta[s].get("country") not in countries, changed(prop, s)))
+            chosen.append(best)
+            pool.remove(best)
+        limited[prop] = [s for s in ok if s in chosen]  # keep the scenes file's order
+    return limited
+
+
 def comprehension_plan(scenes: list[dict[str, Any]], allowed: dict[str, list[str]],
                        baseline_scene: str) -> list[dict[str, Any]]:
     """One comprehension question per scene that has one, never the baseline scene (its
@@ -124,7 +150,8 @@ def build_design(config: dict[str, Any], properties: list[dict[str, Any]],
         versions.append([[ids[i] for i in block] for block in blocks])
 
     pairs = config["ab_pairs_per_participant"]
-    allowed = ab_scenes(properties, scenes, checked)
+    allowed = limit_scenes(ab_scenes(properties, scenes, checked), scenes, checked,
+                           config.get("ab_max_scenes_per_property", 0))
     return {
         "study_id": config["study_id"],
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),

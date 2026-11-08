@@ -219,7 +219,8 @@ alternative). Clips are drawn at 1280 × 720 and delivered at 960 × 540 (about 
 **Which scenes a property uses.** A property can only differ in a scene that has what it acts on: other road users'
 paths need people moving sideways, colour by type needs vehicles, "when shown" needs an event with a few seconds
 before it. `--check` measures, per scene, the share of pixels that differ between the low and high clip and flags
-pairs below 0.2% as `WEAK`; `make_design.py` then lets each property's A/B pair use only the scenes where it passed.
+pairs below 0.2% as `WEAK`; `make_design.py` then lets each property's A/B pair use only the scenes where it passed,
+at most 4 per property (`ab_max_scenes_per_property`), chosen to mix calm and risky scenes and countries.
 Because the pipeline's path covers only where the car actually drives, the path properties pass mostly in scenes
 where the car moves; the highlight properties act on pedestrians and pass mostly in the risky scenes. Both limit how
 far the calm vs risky comparison can be read for those properties.
@@ -249,10 +250,20 @@ URL parameters:
   when present; otherwise a random 14-character code is made.
 * `platform=<name>`: recruitment platform, stored with the data (e.g. `platform=microworkers`).
 
-**Hosting.** The live study runs on a TU/e-managed virtual server, so no participant data goes to an outside hosting,
-database or video service: `app.js` serves the experiment and the clips, writes the responses to `DATA_FILE` on TU/e
-storage, and nginx in front keeps no access log. [`deploy/`](deploy/README.md) has the setup (systemd unit, nginx
-configuration, steps).
+**Hosting.** As in ehmi-vehicles, the live study runs on Heroku (`Procfile`, Node.js 22) with the responses in
+MongoDB (the `CONNECTION` config variable). The clips are not in git (third-party footage), so instead of deploying
+from GitHub, `deploy/heroku.sh` pushes the committed code together with only the clips the design needs (about
+250 MB, under Heroku's 500 MB limit) straight to the Heroku app:
+
+```bash
+heroku login
+heroku create <app> && heroku buildpacks:set heroku/nodejs -a <app>
+heroku config:set CONNECTION='<MongoDB connection string>' -a <app>
+deploy/heroku.sh <app>                                   # DRY_RUN=1 to only build and report the size
+```
+
+On Heroku the participant's IP address comes from the router. [`deploy/README.md`](deploy/README.md) describes the
+alternative of a server of our own (systemd and nginx, responses written to a file, no database).
 
 **Recruitment on Microworkers.** Give the campaign the link `https://<server>/?platform=microworkers` and ask for the
 completion code as proof. The link carries no worker ID: every participant gets a random code, which the finish page
@@ -309,6 +320,8 @@ there is no `config`, `default.config` is used).
 * `bws_items_per_trial`, `bws_appearances_per_item`, `bws_design_versions`: the BWS design.
 * `ab_pairs_per_participant` (10), `ab_repeats` (3), `ab_no_display`, `ab_collect_ratings`, `comprehension`,
   `questionnaires`: the parts of the study.
+* `ab_max_scenes_per_property` (4): scenes each property's A/B pair can use, picked to mix calm and risky scenes and
+  countries (0 = every scene where it passed the check). Fewer scenes means fewer clips to host.
 * `attention_fail_at`: wrong attention answers that end the study.
 * `colour_properties_without_cvd`: leave participants with a colour vision deficiency out of the main results of
   `colour_dependent` properties (they are still compared in `subgroups.csv`).
@@ -352,7 +365,7 @@ uv run pytest
 | `reports/` | literature review behind the properties |
 | `public/` | the experiment (`views/`, `js/`, `css/`), `design.json`, and the clips in `stimuli/` (not in git) |
 | `app.js` | the server: serves the experiment and clips, stores the responses |
-| `deploy/` | setup for the TU/e server |
+| `deploy/` | deployment: `heroku.sh`, or a server of our own (`README.md`) |
 | `avprops/` | Python package: scanning, geometry, rendering, design, data reading, analysis, publication |
 | `scan_videos.py`, `extract_geometry.py`, `render_stimuli.py`, `make_design.py` | making the stimuli and the design |
 | `analysis.py`, `payments.py`, `export_public.py`, `simulate.py` | analysis, payments, publication, simulation |

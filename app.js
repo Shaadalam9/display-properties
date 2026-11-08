@@ -55,8 +55,9 @@ async function storeRows(rows, ip) {
 
 // --- APP
 const app = express();
-// behind nginx on the same machine: take the participant's address from X-Forwarded-For
-app.set('trust proxy', 'loopback');
+// the participant's address comes from X-Forwarded-For, set by the proxy in front: on Heroku its
+// router (one hop, DYNO is set there), on a server of our own nginx on the same machine
+app.set('trust proxy', process.env.DYNO ? 1 : 'loopback');
 app.use(express.json({ limit: '10mb' }));
 
 const file = (relative) => (request, response) => response.sendFile(path.join(ROOT, relative));

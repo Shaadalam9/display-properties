@@ -1,6 +1,6 @@
 {
  "study_id": "av_display_properties_v1",
- "generated_at": "2026-10-28T09:15:02+00:00",
+ "generated_at": "2026-11-08T08:30:54+00:00",
  "properties": [
   {
    "id": "trajectory_alpha",
@@ -4289,56 +4289,22 @@
   "scale_points": 7,
   "scenes": {
    "trajectory_alpha": [
-    "pedestrian_crossing",
     "braking_in_traffic",
-    "unexpected_obstacle",
-    "rotterdam_calm",
     "rotterdam_risky",
-    "valencia_calm",
-    "valencia_risky",
-    "chicago_calm",
-    "chicago_risky",
-    "mexico_city_calm",
-    "mexico_city_risky",
     "jaipur_calm",
-    "jaipur_risky",
-    "hanoi_calm",
-    "kobe_calm",
-    "kobe_risky",
-    "sydney_calm",
-    "sydney_risky"
+    "kobe_risky"
    ],
    "path_width": [
-    "pedestrian_crossing",
     "braking_in_traffic",
-    "unexpected_obstacle",
-    "rotterdam_calm",
     "rotterdam_risky",
-    "valencia_calm",
-    "valencia_risky",
-    "chicago_calm",
-    "chicago_risky",
-    "mexico_city_calm",
-    "mexico_city_risky",
     "jaipur_calm",
-    "jaipur_risky",
-    "hanoi_calm",
-    "kobe_calm",
-    "kobe_risky",
-    "sydney_calm",
-    "sydney_risky"
+    "kobe_risky"
    ],
    "path_length": [
-    "pedestrian_crossing",
-    "braking_in_traffic",
-    "unexpected_obstacle",
     "rotterdam_calm",
-    "rotterdam_risky",
     "chicago_calm",
     "mexico_city_risky",
-    "jaipur_calm",
-    "jaipur_risky",
-    "sydney_risky"
+    "jaipur_risky"
    ],
    "path_style": [
     "braking_in_traffic",
@@ -4347,106 +4313,46 @@
     "rotterdam_risky"
    ],
    "path_uncertainty": [
-    "pedestrian_crossing",
-    "braking_in_traffic",
     "unexpected_obstacle",
     "rotterdam_calm",
-    "rotterdam_risky",
-    "valencia_calm",
-    "valencia_risky",
-    "chicago_calm",
-    "chicago_risky",
     "mexico_city_calm",
-    "mexico_city_risky",
-    "jaipur_calm",
-    "jaipur_risky",
-    "hanoi_calm",
-    "kobe_calm",
-    "kobe_risky",
-    "sydney_calm",
-    "sydney_risky"
+    "jaipur_risky"
    ],
    "manoeuvre_cue": [
     "pedestrian_crossing",
     "braking_in_traffic",
-    "unexpected_obstacle",
-    "rotterdam_calm",
-    "rotterdam_risky",
-    "valencia_calm",
-    "valencia_risky",
-    "chicago_calm",
-    "chicago_risky",
-    "mexico_city_calm",
     "mexico_city_risky",
-    "jaipur_calm",
-    "jaipur_risky",
-    "hanoi_calm",
-    "hanoi_risky",
-    "kobe_calm",
-    "kobe_risky",
-    "sydney_calm",
-    "sydney_risky"
+    "jaipur_calm"
    ],
    "mask_alpha": [
-    "pedestrian_crossing",
-    "unexpected_obstacle",
     "valencia_risky",
-    "chicago_risky",
-    "mexico_city_risky",
     "jaipur_risky",
     "hanoi_calm",
-    "hanoi_risky",
     "kobe_risky"
    ],
    "highlight_scope": [
-    "pedestrian_crossing",
     "braking_in_traffic",
-    "unexpected_obstacle",
     "rotterdam_risky",
-    "valencia_risky",
-    "chicago_calm",
-    "chicago_risky",
     "mexico_city_risky",
-    "jaipur_risky",
-    "hanoi_calm",
-    "hanoi_risky",
-    "kobe_calm",
-    "kobe_risky",
-    "sydney_calm",
-    "sydney_risky"
+    "hanoi_calm"
    ],
    "highlight_style": [
-    "pedestrian_crossing",
-    "unexpected_obstacle",
     "valencia_risky",
-    "chicago_risky",
-    "mexico_city_risky",
     "jaipur_risky",
     "hanoi_calm",
-    "hanoi_risky",
     "kobe_risky"
    ],
    "class_colours": [
-    "pedestrian_crossing",
     "braking_in_traffic",
-    "unexpected_obstacle",
     "rotterdam_risky",
-    "valencia_risky",
-    "chicago_risky",
     "mexico_city_risky",
-    "jaipur_risky",
-    "hanoi_calm",
-    "hanoi_risky",
-    "kobe_calm",
-    "kobe_risky",
-    "sydney_risky"
+    "hanoi_calm"
    ],
    "marker_size": [
     "valencia_risky",
     "jaipur_risky",
     "hanoi_risky",
-    "kobe_risky",
-    "sydney_risky"
+    "kobe_risky"
    ],
    "predicted_paths": [
     "pedestrian_crossing",
@@ -4454,95 +4360,34 @@
     "jaipur_risky"
    ],
    "explanation_detail": [
-    "pedestrian_crossing",
-    "braking_in_traffic",
     "unexpected_obstacle",
-    "rotterdam_calm",
-    "rotterdam_risky",
-    "valencia_calm",
-    "valencia_risky",
-    "chicago_calm",
-    "chicago_risky",
     "mexico_city_calm",
-    "mexico_city_risky",
-    "jaipur_calm",
     "jaipur_risky",
-    "hanoi_calm",
-    "hanoi_risky",
-    "kobe_calm",
-    "kobe_risky",
-    "sydney_calm",
-    "sydney_risky"
+    "sydney_calm"
    ],
    "show_when": [
-    "pedestrian_crossing",
-    "braking_in_traffic",
-    "unexpected_obstacle",
-    "rotterdam_calm",
-    "rotterdam_risky",
     "valencia_calm",
-    "valencia_risky",
-    "chicago_calm",
-    "chicago_risky",
-    "mexico_city_calm",
-    "mexico_city_risky",
-    "jaipur_calm",
     "jaipur_risky",
-    "hanoi_calm",
-    "hanoi_risky",
     "kobe_calm",
-    "kobe_risky",
-    "sydney_calm",
     "sydney_risky"
    ],
    "confidence_indicator": [
     "pedestrian_crossing",
-    "braking_in_traffic",
     "unexpected_obstacle",
     "rotterdam_calm",
-    "rotterdam_risky",
-    "valencia_calm",
-    "valencia_risky",
-    "chicago_calm",
-    "chicago_risky",
-    "mexico_city_calm",
-    "mexico_city_risky",
-    "jaipur_calm",
-    "jaipur_risky",
-    "hanoi_calm",
-    "hanoi_risky",
-    "kobe_calm",
-    "kobe_risky",
-    "sydney_calm",
-    "sydney_risky"
+    "valencia_calm"
    ],
    "background_dim_alpha": [
-    "pedestrian_crossing",
-    "braking_in_traffic",
     "unexpected_obstacle",
     "rotterdam_calm",
-    "rotterdam_risky",
-    "valencia_calm",
-    "valencia_risky",
-    "chicago_calm",
-    "chicago_risky",
-    "mexico_city_calm",
     "mexico_city_risky",
-    "jaipur_calm",
-    "jaipur_risky",
-    "hanoi_calm",
-    "hanoi_risky",
-    "kobe_calm",
-    "kobe_risky",
-    "sydney_calm",
-    "sydney_risky"
+    "jaipur_calm"
    ],
    "palette_id": [
     "valencia_risky",
     "jaipur_risky",
     "hanoi_risky",
-    "kobe_risky",
-    "sydney_risky"
+    "kobe_risky"
    ]
   },
   "repeats": 3,
@@ -4562,17 +4407,11 @@
    "properties": [
     "trajectory_alpha",
     "path_width",
-    "path_length",
     "path_style",
-    "path_uncertainty",
     "manoeuvre_cue",
     "highlight_scope",
     "class_colours",
-    "predicted_paths",
-    "explanation_detail",
-    "show_when",
-    "confidence_indicator",
-    "background_dim_alpha"
+    "predicted_paths"
    ]
   },
   {
@@ -4586,18 +4425,9 @@
    ],
    "correct": "Keep driving slowly in its lane",
    "properties": [
-    "trajectory_alpha",
-    "path_width",
-    "path_length",
     "path_style",
     "path_uncertainty",
-    "manoeuvre_cue",
-    "mask_alpha",
-    "highlight_scope",
-    "highlight_style",
-    "class_colours",
     "explanation_detail",
-    "show_when",
     "confidence_indicator",
     "background_dim_alpha"
    ]

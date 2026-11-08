@@ -1,4 +1,8 @@
-# Running the study on a TU/e server
+# Running the study on a server of our own
+
+The default deployment is Heroku with MongoDB, as in ehmi-vehicles (`deploy/heroku.sh`, see the main README).
+This is the alternative: one virtual server (e.g. TU/e datacenter or SURF Research Cloud) that also stores the
+responses itself.
 
 The study runs on one TU/e-managed virtual server (TU/e datacenter or SURF Research Cloud), so
 that no participant data passes through an outside hosting, database or video service:

@@ -230,3 +230,16 @@ def test_payment_status(config, design):
     documents[1]["data"] = [r for r in documents[1]["data"] if r["task"] not in ("final", "attention")]
     status = payments(records_from(documents, config), config).set_index("code")["status"]
     assert status.to_dict() == {"sim0000": "partial", "sim0001": "none", "sim0002": "full"}
+
+
+def test_scene_limit_mixes_risk_and_countries():
+    from avprops.design import limit_scenes
+    scenes = [{"id": f"s{k}", "criticality": "high" if k < 4 else "low", "country": ["NL", "NL", "US", "IN", "NL", "JP"][k]}
+              for k in range(6)]
+    checked = {f"s{k}": {"p": {"changed": 1.0 - k / 10}} for k in range(6)}  # s0 differs most
+    limited = limit_scenes({"p": [s["id"] for s in scenes]}, scenes, checked, 3)["p"]
+    meta = {s["id"]: s for s in scenes}
+    assert len(limited) == 3 and "s0" in limited
+    assert {meta[s]["criticality"] for s in limited} == {"high", "low"}
+    assert len({meta[s]["country"] for s in limited}) == 3
+    assert limit_scenes({"p": ["s0", "s1"]}, scenes, checked, 0) == {"p": ["s0", "s1"]}

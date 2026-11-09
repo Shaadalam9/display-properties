@@ -5,8 +5,10 @@ var STUDY_TEXT = {
     welcome:
         '<h1>Welcome</h1>' +
         '<p>Thank you for taking part.</p>' +
-        '<p>In this study you will watch short videos recorded from a car that drives itself. The videos show a ' +
-        'display that explains what the car is doing. You will tell us which parts of such a display matter to you.</p>' +
+        '<p>In this study you will watch short videos of real traffic, filmed from cars driven by people. We have ' +
+        'added a display on top of the videos, like one that a car that drives itself could show its passengers.</p>' +
+        '<p>While you watch, <strong>imagine that you are a passenger and the car drives itself</strong>: the ' +
+        'display explains what the car is doing and why. You will tell us which parts of such a display matter to you.</p>' +
         '<p>The study takes about 30 minutes. Please stay on this page until the end and do not switch to other tabs.</p>',
     consent:
         '<h1>Information and consent</h1>' +
@@ -14,10 +16,12 @@ var STUDY_TEXT = {
         '<p><strong>Who we are.</strong> This study is run by researchers at Eindhoven University of Technology ' +
         '(TU/e), the Netherlands [and partners, as in the approved application]. It has been approved by ' +
         '[ethics committee, reference number].</p>' +
-        '<p><strong>Purpose.</strong> We want to find out which parts of a display in a self-driving car help ' +
-        'passengers understand what the car does and why.</p>' +
+        '<p><strong>Purpose.</strong> We want to find out which parts of a display in a future self-driving car ' +
+        'would help passengers understand what the car does and why.</p>' +
         '<p><strong>What you will do.</strong> Answer a few questions about yourself, watch short videos of traffic ' +
-        'recorded from a car, and say which display features matter to you and which of two videos you prefer. ' +
+        'and say which display features matter to you and which of two videos you prefer. The videos were filmed ' +
+        'by people driving ordinary cars and are publicly available; the researchers added the display. You are ' +
+        'asked to imagine that the car drives itself. ' +
         'This takes about 30 minutes. Some videos show busy traffic and pedestrians close to the car.</p>' +
         '<p><strong>Payment.</strong> You are paid through the crowdsourcing platform with the code shown at the end. ' +
         'If the study is ended early because of incorrect answers to the screening questions, you receive a ' +
@@ -47,9 +51,10 @@ var STUDY_TEXT = {
     declined: '<h1>Thank you</h1><p>You chose not to take part. You may now close this tab.</p>',
     comprehensionIntro:
         '<h1>What happens next?</h1>' +
-        '<p>You will see a few short videos recorded from a car that drives itself. Each video stops before the end.</p>' +
+        '<p>You will see a few short videos with the display. Imagine that the car drives itself. Each video stops ' +
+        'before the end.</p>' +
         '<p>After each video, choose what you think the car will do next.</p>',
-    baselineIntro: 'Watch this video of a car that drives itself. The coloured overlay is the car\'s display.',
+    baselineIntro: 'Watch this video and imagine that the car drives itself. The coloured overlay is its display.',
     openQuestion: 'What would you want this display to show, or show differently? Write anything that comes to mind. ' +
         '(Please do not include your name or other details that could identify you.)',
     bwsIntro:
@@ -72,7 +77,7 @@ var STUDY_TEXT = {
 // ends when attention_fail_at answers are wrong (setting in the config / design.json).
 var ATTENTION_QUESTIONS = [
     { question: 'What is 2+2?', options: ['22', '4', '12'], correct: '4' },
-    { question: 'What are you doing in this study?', options: ['Watching videos of a car that drives itself', 'Listening to music', 'Drawing patterns on the screen'], correct: 'Watching videos of a car that drives itself' },
+    { question: 'What are you doing in this study?', options: ['Watching videos of traffic with a display', 'Listening to music', 'Drawing patterns on the screen'], correct: 'Watching videos of traffic with a display' },
     { question: 'Select the true statement.', options: ['Paris is the capital of Germany', 'Water is wet', 'The sun is purple'], correct: 'Water is wet' },
     { question: 'What do the videos in this study show?', options: ['Traffic seen from a car', 'Paintings', 'Supermarket products'], correct: 'Traffic seen from a car' },
     { question: 'Please select "Bus" to confirm you are reading carefully.', options: ['Car', 'Truck', 'Bus'], correct: 'Bus' }

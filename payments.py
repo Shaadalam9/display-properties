@@ -7,9 +7,11 @@ Participants paste the code from the finish page into Microworkers as proof. A c
     partial  the study was ended by the attention checks (the finish_fail page shows the code)
     none     the code is not in the data, or the participant left before the end
 The ``review`` column repeats the analysis's exclusion reasons (answered too fast, same IP
-address as an earlier participant, ...): the researcher decides about these by hand, so no
-payment is refused automatically. Writes payments.csv to the output folder (it holds the
-completion codes, so keep it with the study data, not in git).
+address as an earlier participant, incomplete data, ...): the researcher decides about these
+by hand, so no payment is refused automatically. "incomplete data" on a ``full`` code means the
+record lacks trials: rows lost on the way, or rows sent to the server by hand to fake a
+completion. Writes payments.csv to the output folder (it holds the completion codes, so keep
+it with the study data, not in git).
 """
 
 from __future__ import annotations
@@ -19,7 +21,7 @@ import argparse
 import pandas as pd
 
 from avprops.analysis import apply_exclusions
-from avprops.common import load_config, resolve
+from avprops.common import load_config, load_properties, resolve
 from avprops.crowd import read_rows, rows_to_records
 
 
@@ -31,8 +33,9 @@ def payment_status(rec: dict) -> str:
     return "none"
 
 
-def payments(records: list[dict], config: dict) -> pd.DataFrame:
-    _, exclusions = apply_exclusions(records, config)
+def payments(records: list[dict], config: dict, n_items: int | None = None) -> pd.DataFrame:
+    """``n_items`` (the number of properties) adds the "incomplete data" flag."""
+    _, exclusions = apply_exclusions(records, config, n_items)
     reasons = exclusions.set_index("pid")["reasons"]
     # the payment does not depend on these: they are flags for the researcher's own check
     review = {pid: "; ".join(r for r in text.split("; ") if r and r != "did not finish"
@@ -53,7 +56,7 @@ def main() -> None:
     args = parser.parse_args()
 
     records = rows_to_records(read_rows([resolve(f) for f in args.data]), config["attention_max_wrong"])
-    table = payments(records, config)
+    table = payments(records, config, len(load_properties(config)))
     out = resolve(args.out)
     out.mkdir(parents=True, exist_ok=True)
     table.to_csv(out / "payments.csv", index=False)

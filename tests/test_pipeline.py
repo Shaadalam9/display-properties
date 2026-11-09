@@ -4,7 +4,7 @@ import json
 import numpy as np
 import pytest
 
-from avprops.analysis import analyse
+from avprops.analysis import analyse, expected_trials
 from avprops.common import load_config, load_properties, load_scenes
 from avprops.crowd import read_documents, read_rows, rows_to_records
 from avprops.design import build_design, bws_version
@@ -201,6 +201,82 @@ def test_duplicate_ip_keeps_the_first_and_is_masked(config, design, tmp_path):
     ips = result["participants"].set_index("pid")["ip"]
     assert ips["sim0004"] == ips["sim0001"] and all(ip.startswith("0.0.0.") for ip in ips)
     assert "203.0.113" not in result["participants"].to_csv()
+
+
+def records_with_ips(documents, config, tmp_path):
+    """Records read from the file the server writes, so every row carries its document's IP address."""
+    path = tmp_path / "entries.jsonl"
+    path.write_text("\n".join(json.dumps(d) for d in documents) + "\n")
+    return rows_to_records(read_rows([path]), config["attention_max_wrong"])
+
+
+def attentive(document):
+    """The simulated participant answers every attention check correctly."""
+    for row in document["data"]:
+        if row["task"] == "attention":
+            row["correct"] = True
+    return document
+
+
+def test_reloaded_session_is_kept_but_ended_sessions_still_count(config, design, tmp_path):
+    documents, _ = simulate(design, n=3, seed=12)
+    for k, doc in enumerate(documents):
+        attentive(doc)["ip"] = f"198.51.100.{k}"
+    # participant 0 reloaded the page halfway: that attempt has another code and never ended
+    reloaded = {"ip": documents[0]["ip"],
+                "data": [dict(r, worker_code="AVFIRSTATTEMPT") for r in documents[0]["data"][:25]]}
+    # participant 1 was first stopped by the attention checks, then came back under a new code
+    stopped = {"ip": documents[1]["ip"],
+               "data": [dict(r, worker_code="AVSTOPPEDFIRST", **({"correct": False} if r["task"] == "attention" else {}))
+                        for r in documents[1]["data"] if r["task"] != "final"]}
+    records = records_with_ips([reloaded, stopped] + documents, config, tmp_path)
+    reasons = analyse(records, load_properties(config), config)["exclusions"].set_index("pid")["reasons"]
+    assert reasons["sim0000"] == "" and reasons["sim0002"] == ""
+    assert reasons["AVFIRSTATTEMPT"] == "did not finish"
+    assert "same IP address as an earlier participant" in reasons["sim0001"]
+
+
+def test_forged_completion_is_flagged_and_left_out(config, design, tmp_path):
+    from payments import payments
+    documents, _ = simulate(design, n=3, seed=13)
+    for k, doc in enumerate(documents):
+        attentive(doc)["ip"] = f"198.51.100.{k}"
+    # one row sent to the server by hand: the last page, for a made-up code
+    forged = {"ip": "203.0.113.9", "data": [{"worker_code": "AVFORGEDCODE00", "trial_index": 0, "task": "final",
+                                             "response": {"comment": ""}}]}
+    records = records_with_ips(documents + [forged], config, tmp_path)
+    properties = load_properties(config)
+    result = analyse(records, properties, config)
+    bws, ab = expected_trials(config, len(properties))
+    reasons = result["exclusions"].set_index("pid")["reasons"]
+    assert reasons["AVFORGEDCODE00"] == f"incomplete data (no consent, 0 of {bws} BWS trials, 0 of {ab} A/B pairs)"
+    assert result["n_kept"] == 3
+    review = payments(records, config, len(properties)).set_index("code")["review"]
+    assert review["AVFORGEDCODE00"].startswith("incomplete data") and review["sim0000"] == ""
+
+
+def test_design_versions_are_not_pooled_silently(config, design):
+    documents, _ = simulate(design, n=6, seed=14)
+    for k, doc in enumerate(documents):
+        for row in attentive(doc)["data"]:
+            if k < 3:
+                row["design_generated_at"] = "2026-01-01T00:00:00+00:00"
+    properties = load_properties(config)
+    with pytest.raises(ValueError, match="different designs"):
+        analyse(records_from(documents, config), properties, config)
+    current = dict(config, design_versions=[design["generated_at"]])
+    reasons = analyse(records_from(documents, current), properties, current)["exclusions"]["reasons"]
+    assert [r.startswith("other design version") for r in reasons] == [True] * 3 + [False] * 3
+
+
+def test_other_study_is_left_out(config, design):
+    documents, _ = simulate(design, n=2, seed=15)
+    for row in documents[0]["data"]:
+        row["study_id"] = "av_display_properties_pilot"
+    reasons = analyse(records_from(documents, config), load_properties(config), config)["exclusions"] \
+        .set_index("pid")["reasons"]
+    assert "other study (av_display_properties_pilot)" in reasons["sim0000"]
+    assert "other study" not in reasons["sim0001"]
 
 
 def test_public_export_has_no_codes_ips_or_exact_ages(config, design, tmp_path):

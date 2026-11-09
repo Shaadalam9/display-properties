@@ -3,8 +3,11 @@
 Inputs are participant records built from the crowdsourced rows by avprops.crowd.
 The steps mirror the study design:
 
-1. Exclusions: debug sessions, unfinished sessions, too many wrong attention answers,
-   implausibly fast BWS answers, A/B pairs answered with the tab hidden too often.
+1. Exclusions: debug sessions, other studies, unfinished sessions, finished records that
+   lack trials, later sessions from an address whose earlier session ended, too many wrong
+   attention answers, implausibly fast BWS answers, A/B pairs answered with the tab hidden
+   too often. The analysis stops when the kept participants saw different versions of the
+   design, unless ``design_versions`` names the version(s) to analyse.
 2. Task A (BWS): per participant, (times best - times worst) / times shown for each
    property; the property's score is the mean over participants with a bootstrap CI.
 3. Task B (A/B pairs): share who noticed the difference; among those who noticed,
@@ -31,6 +34,7 @@ Alongside the selection:
 
 from __future__ import annotations
 
+import math
 from typing import Any
 
 import numpy as np
@@ -42,25 +46,71 @@ from avprops.crowd import mask_ips
 RATING_KEYS = ("understanding", "safety", "load")
 
 
-def apply_exclusions(records: list[dict], config: dict) -> tuple[list[dict], pd.DataFrame]:
-    """Return the kept records and a table of every participant with the reason excluded."""
+def ended(rec: dict, config: dict) -> bool:
+    """Whether the session reached an end: the last page, or the attention checks stopped it
+    (``attention_fail_at`` wrong answers). A session left halfway, e.g. by reloading the page,
+    did not end."""
+    wrong = (rec.get("attention") or {}).get("wrong") or 0
+    return bool(rec.get("finished")) or wrong >= config.get("attention_fail_at", math.inf)
+
+
+def expected_trials(config: dict, n_items: int) -> tuple[int, int]:
+    """BWS trials and A/B pairs (repeats and the display vs no display pair included) that every
+    participant gets, as design.build_design and the experiment make them."""
+    k = min(config["bws_items_per_trial"], n_items)
+    bws = math.ceil(n_items * config["bws_appearances_per_item"] / k)
+    pairs = config["ab_pairs_per_participant"]
+    pairs = n_items if pairs in (0, None) else min(pairs, n_items)
+    repeats = min(int(config.get("ab_repeats", 0)), pairs)
+    return bws, pairs + repeats + int(bool(config.get("ab_no_display", False)))
+
+
+def missing_data(rec: dict, expected: tuple[int, int]) -> str:
+    """What a record lacks of a whole session ("" when nothing): consent, BWS trials, A/B pairs.
+    The server stores whatever rows it is sent, so a record can hold a last row and little else."""
+    bws, ab = expected
+    missing = [] if rec.get("consent") else ["no consent"]
+    if len(rec.get("bws", [])) < bws:
+        missing.append(f"{len(rec.get('bws', []))} of {bws} BWS trials")
+    if len(rec.get("ab", [])) < ab:
+        missing.append(f"{len(rec.get('ab', []))} of {ab} A/B pairs")
+    return ", ".join(missing)
+
+
+def apply_exclusions(records: list[dict], config: dict,
+                     n_items: int | None = None) -> tuple[list[dict], pd.DataFrame]:
+    """Return the kept records and a table of every participant with the reason excluded.
+    With ``n_items`` (the number of properties) a finished record must also hold every trial."""
     kept, rows = [], []
-    # a later participant from an address already seen took part twice (or shares a device):
-    # keep the first one only; debug sessions do not count
+    # a later participant from an address whose earlier session ended took part twice (or shares
+    # a device): keep the first one only. A session left halfway does not count, so a participant
+    # who reloads the page (and so gets a new code) keeps the session they finish; debug sessions
+    # do not count either
     later_same_ip, seen = set(), set()
     for rec in sorted(records, key=lambda r: r.get("arrival", 0)):
         if rec.get("ip") and not rec.get("debug"):
             if rec["ip"] in seen:
                 later_same_ip.add(id(rec))
-            seen.add(rec["ip"])
+            if ended(rec, config):
+                seen.add(rec["ip"])
+    expected = expected_trials(config, n_items) if n_items else None
+    versions = config.get("design_versions") or []
     for rec in records:
         reasons = []
         if config["exclude_debug"] and rec.get("debug"):
             reasons.append("debug session")
+        if rec.get("study_id") and rec["study_id"] != config["study_id"]:
+            reasons.append(f"other study ({rec['study_id']})")
+        if versions and rec.get("design_generated_at") not in versions:
+            reasons.append(f"other design version ({rec.get('design_generated_at')})")
         if config.get("exclude_duplicate_ip", True) and id(rec) in later_same_ip:
             reasons.append("same IP address as an earlier participant")
         if config["exclude_unfinished"] and rec.get("finished") is False:
             reasons.append("did not finish")
+        if expected and config.get("exclude_incomplete", True) and rec.get("finished"):
+            missing = missing_data(rec, expected)
+            if missing:
+                reasons.append(f"incomplete data ({missing})")
         attention = rec.get("attention") or {}
         if not attention.get("passed", False):
             reasons.append(f"more than {config['attention_max_wrong']} wrong attention answers")
@@ -353,7 +403,13 @@ def analyse(records: list[dict], properties: list[dict], config: dict,
             questionnaires: list[dict] | None = None, scenes: list[dict] | None = None) -> dict[str, Any]:
     questionnaires = questionnaires or []
     prop_ids = [p["id"] for p in properties]
-    kept, exclusions = apply_exclusions(records, config)
+    kept, exclusions = apply_exclusions(records, config, len(prop_ids))
+    # a design.json made again (another generated_at) can assign other trials: never pool
+    # participants of different versions without saying which ones belong to the study
+    versions = sorted({str(r.get("design_generated_at")) for r in kept})
+    if len(versions) > 1 and not config.get("design_versions"):
+        raise ValueError(f"the kept participants saw {len(versions)} different designs ({', '.join(versions)}); "
+                         "list the one(s) to analyse in design_versions in the config")
     mask_ips(records)  # the addresses are not needed after the exclusions; no output holds them
     individual = bws_individual(kept, prop_ids)
     summary = bws_summary(individual, config["bootstrap_samples"], config["bootstrap_seed"])

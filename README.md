@@ -326,8 +326,10 @@ uv run python payments.py --data /srv/study-data/entries.jsonl --check CODE1 COD
 ```
 
 `payments.csv` lists every code as `full` (reached the end), `partial` (stopped by the attention checks) or `none`,
-with a `review` column of quality flags (answered too fast, same IP address as an earlier participant) for the
-researcher to decide on by hand; no payment is refused automatically. Delete `payments.csv` once everyone is paid.
+with a `review` column of quality flags (answered too fast, same IP address as an earlier participant, incomplete
+data) for the researcher to decide on by hand; no payment is refused automatically. `incomplete data` on a `full`
+code means the record lacks trials: rows lost on the way, or rows sent to the server by hand to fake a completion.
+Delete `payments.csv` once everyone is paid.
 
 **Sample.** To compare regions, run one campaign per region with the platform's country targeting and its own quota,
 and keep the groups roughly equal. Leave out countries where the data may not be processed (see the data management
@@ -376,9 +378,14 @@ there is no `config`, `default.config` is used).
 * `attention_fail_at`: wrong attention answers that end the study.
 * `colour_properties_without_cvd`: leave participants with a colour vision deficiency out of the main results of
   `colour_dependent` properties (they are still compared in `subgroups.csv`).
-* Exclusions: `exclude_debug`, `exclude_unfinished`, `attention_max_wrong`, `min_median_bws_rt_ms`,
-  `min_repeat_consistency`, `max_hidden_ab_share`, and `exclude_duplicate_ip` (keep only the first participant from
-  each IP address, as in [Bazilinskyy et al., 2022](https://doi.org/10.54941/ahfe1002444)).
+* Exclusions: `exclude_debug`, `exclude_unfinished`, `exclude_incomplete` (a finished record must hold the consent,
+  every BWS trial and every A/B pair), `attention_max_wrong`, `min_median_bws_rt_ms`, `min_repeat_consistency`,
+  `max_hidden_ab_share`, and `exclude_duplicate_ip` (keep only the first participant from each IP address, as in
+  [Bazilinskyy et al., 2022](https://doi.org/10.54941/ahfe1002444); only a session that ended, finished or stopped by
+  the attention checks, counts as first, so a participant who reloads the page and finishes under a new code is kept).
+* `study_id` and `design_versions`: records with another `study_id` are left out. When the kept participants saw more
+  than one version of `design.json` (its `generated_at`), the analysis stops until `design_versions` lists the
+  version(s) to analyse. Give the pilot its own `study_id`, so its data stay out of the main analysis.
 * Selection rules: `select_n`, `noticed_min_share`, `matters_top_fraction`, `disagreement_max_majority_share`,
   `redundancy_min_abs_r`.
 

@@ -51,8 +51,8 @@ def anonymise(records: list[dict], seed: int | None = None) -> dict[str, pd.Data
         bws += [{"participant": pid, **{k: t.get(k) for k in ("trial", "best", "worst", "rt_ms", "hidden")},
                  "items": ";".join(t.get("items") or [])} for t in rec.get("bws", [])]
         ab += [{"participant": pid, **{k: p.get(k) for k in (
-            "index", "property", "scene", "a_level", "b_level", "high_variant", "noticed", "preferred_level",
-            "importance", "repeat", "rt_ms", "hidden")},
+            "index", "property", "scene", "a_level", "b_level", "high_variant", "catch", "noticed", "preferred_level",
+            "preference", "importance", "rt_ms", "hidden")},
             **{f"rating_{side}_{key}": v for side, ratings in (p.get("ratings") or {}).items()
                if isinstance(ratings, dict) for key, v in ratings.items()}} for p in rec.get("ab", [])]
         comprehension += [{"participant": pid, **c} for c in rec.get("comprehension", [])]

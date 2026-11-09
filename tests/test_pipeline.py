@@ -73,28 +73,44 @@ def test_rows_become_one_record_per_worker(design, config):
     rec = records[0]
     assert rec["finished"] and rec["consent"]
     assert len(rec["bws"]) == len(design["bws"]["versions"][rec["bws_version"]])
-    firsts = [p for p in rec["ab"] if not p["repeat"] and p["property"] != "no_display"]
-    assert len(firsts) == design["ab"]["pairs_per_participant"]
-    assert sum(p["repeat"] for p in rec["ab"]) == design["ab"]["repeats"]
+    ab = design["ab"]
+    pairs = [p for p in rec["ab"] if not p["catch"] and p["property"] != "no_display"]
+    assert len(pairs) == ab["tunable_per_participant"] * ab["scenes_per_property"] + ab["categorical_per_participant"]
+    assert sum(p["catch"] for p in rec["ab"]) == ab["catch_pairs"]
+    kind = {p["id"]: p["type"] for p in design["properties"]}
+    per_prop = {}
+    for p in pairs:
+        per_prop.setdefault(p["property"], []).append(p["scene"])
+    for prop, scenes in per_prop.items():  # tunable: two different scenes; categorical: one
+        assert len(set(scenes)) == len(scenes) == (1 if kind[prop] == "categorical" else ab["scenes_per_property"])
 
 
 def test_analysis_recovers_simulated_truth(config, design):
-    documents, truth = simulate(design, n=150, seed=3)
+    documents, truth = simulate(design, n=400, seed=5, config=config)  # five tunable two-type properties
     summary = analyse(records_from(documents, config), load_properties(config), config)["summary"]
-    true_imp = [truth[p]["importance"] for p in summary.index]
-    true_pref = [truth[p]["prefer_high"] for p in summary.index]
-    assert np.corrcoef(summary["bws_score"], true_imp)[0, 1] > 0.9
-    assert np.corrcoef(summary["prefer_high_share"], true_pref)[0, 1] > 0.85
-    assert 1 <= summary["selected"].sum() <= config["select_n"]
-    assert summary["status"].notna().all()
+    assert np.corrcoef(summary["bws_score"], [truth[p]["bws_score"] for p in summary.index])[0, 1] > 0.95
+    # H is recovered where enough participants chose a level in both scenes
+    enough = summary[summary["H_n"] >= 40]
+    assert np.corrcoef(enough["H"], [truth[p]["H"] for p in enough.index])[0, 1] > 0.7
+    types = [p for p in summary.index if truth[p]["kind"] == "types" and summary.loc[p, "H_n"] >= 15]
+    others = [p for p in summary.index if truth[p]["kind"] != "types" and summary.loc[p, "H_n"] >= 15]
+    assert types and others
+    assert summary.loc[types, "H"].mean() > summary.loc[others, "H"].mean() + 0.25
+    assert summary["selected"].sum() <= config["select_n"]
+    assert summary["status"].notna().all() and summary["p_selected"].between(0, 1).all()
 
 
 def test_selected_properties_meet_every_rule(config, design):
-    documents, _ = simulate(design, n=150, seed=4)
+    documents, _ = simulate(design, n=300, seed=4, config=config)
     summary = analyse(records_from(documents, config), load_properties(config), config)["summary"]
     chosen = summary[summary["selected"]]
-    assert (chosen["noticed_share"] >= config["noticed_min_share"]).all()
-    assert (chosen["majority_share"] <= config["disagreement_max_majority_share"]).all()
+    assert chosen["type"].isin(["continuous", "ordinal"]).all()
+    assert (chosen["noticed_corrected"] >= config["noticed_min_share"]).all()
+    assert (chosen["H"] >= config["heterogeneity_min"]).all()
+    assert not summary.loc[summary["type"] == "categorical", "selected"].any()
+    others = summary[summary["eligible"] & ~summary["selected"]]
+    if len(chosen) and len(others):
+        assert chosen["score"].min() >= others["score"].max()
 
 
 def test_exclusions(config, design):
@@ -120,25 +136,23 @@ def test_new_measures_are_recovered(config, design):
     design = dict(design, questionnaires=[
         {k: q[k] for k in ("id", "name", "preamble", "labels")} | {"items": q["items"]}
         for q in load_questionnaires(config)])
-    documents, truth = simulate(design, n=400, seed=6)
+    documents, truth = simulate(design, n=400, seed=6, config=config)
     config = dict(config, colour_properties_without_cvd=False)  # count every pair (tested separately)
     result = analyse(records_from(documents, config), load_properties(config), config, load_questionnaires(config))
-    assert abs(result["repeat_consistency"] - truth["_global"]["repeat_consistency"]) < 0.06
+    assert abs(result["false_alarm_rate"] - truth["_global"]["false_alarm"]) < 0.05
     assert abs(result["prefers_no_display"] - truth["_global"]["prefer_no_display"]) < 0.06
     summary = result["summary"]
     # lower trust -> prefers the high (more information) level, for the moderated properties only
     r = summary["high_vs_propensity_to_trust_r"]
     moderated = r[list(TRUST_MODERATED)]
-    others = r.drop(list(TRUST_MODERATED)).dropna()
-    assert (moderated < 0).all()
-    assert moderated.mean() < -0.2
-    assert abs(others.mean()) < 0.05
-    # repeats and the no-display pair stay out of the property results
+    assert (moderated < 0).all() and moderated.mean() < -0.2
+    assert abs(r.drop(list(TRUST_MODERATED)).dropna().mean()) < 0.05
+    # catch pairs and the no-display pair stay out of the property results
     assert "no_display" not in summary.index
     kept = set(result["participants"].query("not excluded")["pid"])
-    firsts = sum(1 for d in documents for row in d["data"] if row["worker_code"] in kept
-                 and row["task"] == "ab" and not row["repeat"] and row["property"] != "no_display")
-    assert summary["ab_n"].sum() == firsts
+    counted = sum(1 for d in documents for row in d["data"] if row["worker_code"] in kept
+                  and row["task"] == "ab" and not row["catch"] and row["property"] != "no_display")
+    assert summary["ab_n"].sum() == counted
     assert (summary["comprehension_n_low"] + summary["comprehension_n_high"]).sum() == \
         result["n_kept"] * len(design["comprehension"])
 
@@ -152,28 +166,28 @@ def test_reversed_questionnaire_items_are_flipped(config):
     assert questionnaire_scores(record, ptt)["propensity_to_trust"] == 5.0
 
 
-def test_low_repeat_consistency_can_exclude(config, design):
+def test_false_alarms_can_exclude(config, design):
     documents, _ = simulate(design, n=10, seed=7)
     for row in documents[0]["data"]:
-        if row["task"] == "ab" and row.get("repeat"):
-            row["preferred_level"] = "low" if row["preferred_level"] == "high" else "high"
-    strict = dict(config, min_repeat_consistency=0.5)
-    excluded = set(analyse(records_from(documents, strict), load_properties(strict), strict)["exclusions"]
-                   .query("excluded")["pid"])
-    assert "sim0000" in excluded
+        if row["task"] == "ab" and row.get("catch"):
+            row["noticed"] = True  # a difference reported between two identical clips
+    strict = dict(config, max_catch_noticed=0)
+    reasons = analyse(records_from(documents, strict), load_properties(strict), strict)["exclusions"] \
+        .set_index("pid")["reasons"]
+    assert "identical pairs" in reasons["sim0000"]
 
 
 def test_subgroups_find_colour_vision_and_criticality_effects(config, design):
     from avprops.common import load_questionnaires
     from simulate import COLOUR_DEPENDENT, HIGH_CRITICALITY_EFFECT
-    documents, _ = simulate(design, n=400, seed=8)
+    documents, _ = simulate(design, n=1200, seed=8, config=config)
     records = records_from(documents, config)
     result = analyse(records, load_properties(config), config, load_questionnaires(config), load_scenes(config))
     sub = result["subgroups"]
     for prop in COLOUR_DEPENDENT:
         rows = sub[(sub["property"] == prop) & (sub["factor"] == "colour_vision")].set_index("group")
-        assert rows.loc["deficiency", "noticed_share"] < rows.loc["typical", "noticed_share"] - 0.3
-        assert rows["p_noticed_differs"].iloc[0] < 0.01
+        assert rows.loc["deficiency", "noticed_share"] < rows.loc["typical", "noticed_share"] - 0.25
+        assert rows["p_noticed_differs"].iloc[0] < 0.05
     for prop in HIGH_CRITICALITY_EFFECT:
         rows = sub[(sub["property"] == prop) & (sub["factor"] == "criticality")].set_index("group")
         assert rows.loc["high", "prefer_high_share"] > rows.loc["low", "prefer_high_share"]
@@ -183,7 +197,7 @@ def test_subgroups_find_colour_vision_and_criticality_effects(config, design):
     kept = set(result["participants"].query("not excluded")["pid"])
     for prop in COLOUR_DEPENDENT:
         counted = sum(1 for r in records if r["pid"] in kept - cvd for p in r["ab"]
-                      if p["property"] == prop and not p["repeat"])
+                      if p["property"] == prop and not p["catch"])
         assert result["summary"].loc[prop, "ab_n"] == counted
 
 
@@ -247,11 +261,11 @@ def test_forged_completion_is_flagged_and_left_out(config, design, tmp_path):
     records = records_with_ips(documents + [forged], config, tmp_path)
     properties = load_properties(config)
     result = analyse(records, properties, config)
-    bws, ab = expected_trials(config, len(properties))
+    bws, ab = expected_trials(config, properties)
     reasons = result["exclusions"].set_index("pid")["reasons"]
     assert reasons["AVFORGEDCODE00"] == f"incomplete data (no consent, 0 of {bws} BWS trials, 0 of {ab} A/B pairs)"
     assert result["n_kept"] == 3
-    review = payments(records, config, len(properties)).set_index("code")["review"]
+    review = payments(records, config, properties).set_index("code")["review"]
     assert review["AVFORGEDCODE00"].startswith("incomplete data") and review["sim0000"] == ""
 
 
@@ -319,3 +333,14 @@ def test_scene_limit_mixes_risk_and_countries():
     assert {meta[s]["criticality"] for s in limited} == {"high", "low"}
     assert len({meta[s]["country"] for s in limited}) == 3
     assert limit_scenes({"p": ["s0", "s1"]}, scenes, checked, 0) == {"p": ["s0", "s1"]}
+
+
+def test_heterogeneity_tells_stable_types_from_coin_flips():
+    from avprops.analysis import icc_two
+    rng = np.random.default_rng(0)
+    types = rng.choice([-1.0, 1.0], 400)                      # each person always picks their level
+    assert icc_two(types, types) == pytest.approx(1.0)
+    flips = rng.choice([-1.0, 1.0], (2, 400))                 # nobody cares: two independent coin flips
+    assert abs(icc_two(*flips)) < 0.12
+    consensus = np.where(rng.random((2, 400)) < 0.9, 1.0, -1.0)  # everyone prefers high, with slips
+    assert abs(icc_two(*consensus)) < 0.12

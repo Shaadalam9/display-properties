@@ -47,8 +47,10 @@ def main() -> None:
     print(f"  {len(properties)} properties, {len(design['scenes'])} scenes")
     print(f"  BWS: {len(design['bws']['versions'])} versions x {n_trials} trials "
           f"of {design['bws']['items_per_trial']} properties")
-    print(f"  A/B pairs per participant: {design['ab']['pairs_per_participant']} + {design['ab']['repeats']} repeated"
-          + (" + 1 display vs no display" if design["ab"]["no_display"] else ""))
+    ab = design["ab"]
+    print(f"  A/B pairs per participant: {ab['tunable_per_participant']} tunable properties x "
+          f"{ab['scenes_per_property']} scenes + {ab['categorical_per_participant']} categorical + "
+          f"{ab['catch_pairs']} catch pairs" + (" + 1 display vs no display" if ab["no_display"] else ""))
     print(f"  Comprehension questions: {len(design['comprehension'])} "
           f"({', '.join(c['scene'] for c in design['comprehension'])})")
     print(f"  Questionnaires: {', '.join(q['id'] for q in design['questionnaires']) or 'none'}")

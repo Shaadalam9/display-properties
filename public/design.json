@@ -1,9 +1,10 @@
 {
  "study_id": "av_display_properties_v1",
- "generated_at": "2026-11-08T08:30:54+00:00",
+ "generated_at": "2026-11-09T13:41:01+00:00",
  "properties": [
   {
    "id": "trajectory_alpha",
+   "type": "continuous",
    "element": "Planned path",
    "name": "Path visibility",
    "description": "How strongly the car's planned path is drawn on the road.",
@@ -13,6 +14,7 @@
   },
   {
    "id": "path_width",
+   "type": "continuous",
    "element": "Planned path",
    "name": "Path width",
    "description": "How wide the planned path is drawn.",
@@ -22,6 +24,7 @@
   },
   {
    "id": "path_length",
+   "type": "continuous",
    "element": "Planned path",
    "name": "Path length",
    "description": "How far ahead the planned path is shown.",
@@ -31,6 +34,7 @@
   },
   {
    "id": "path_style",
+   "type": "categorical",
    "element": "Planned path",
    "name": "Path style",
    "description": "Whether the path is a plain band or carries arrows that flow forward.",
@@ -40,6 +44,7 @@
   },
   {
    "id": "path_uncertainty",
+   "type": "continuous",
    "element": "Planned path",
    "name": "Path certainty colour",
    "description": "Whether the path changes colour further ahead, where the car is less certain.",
@@ -49,6 +54,7 @@
   },
   {
    "id": "manoeuvre_cue",
+   "type": "categorical",
    "element": "Planned manoeuvre",
    "name": "Manoeuvre cue",
    "description": "An icon and short text naming the car's next manoeuvre.",
@@ -58,6 +64,7 @@
   },
   {
    "id": "mask_alpha",
+   "type": "continuous",
    "element": "Road users",
    "name": "Highlight strength",
    "description": "How strongly the road users the car reacts to are highlighted.",
@@ -67,6 +74,7 @@
   },
   {
    "id": "highlight_scope",
+   "type": "categorical",
    "element": "Road users",
    "name": "Which road users are highlighted",
    "description": "Only the road users the car reacts to, or every road user it detects.",
@@ -76,6 +84,7 @@
   },
   {
    "id": "highlight_style",
+   "type": "categorical",
    "element": "Road users",
    "name": "Highlight style",
    "description": "How the road users are marked.",
@@ -85,6 +94,7 @@
   },
   {
    "id": "class_colours",
+   "type": "categorical",
    "element": "Road users",
    "name": "Colour by road-user type",
    "description": "Whether pedestrians and vehicles are highlighted in different colours.",
@@ -94,6 +104,7 @@
   },
   {
    "id": "marker_size",
+   "type": "continuous",
    "element": "Road users",
    "name": "Pedestrian marker size",
    "description": "Size of the marker above pedestrians.",
@@ -103,6 +114,7 @@
   },
   {
    "id": "predicted_paths",
+   "type": "categorical",
    "element": "Road users",
    "name": "Other road users' paths",
    "description": "Lines showing where moving road users are heading.",
@@ -112,6 +124,7 @@
   },
   {
    "id": "explanation_detail",
+   "type": "ordinal",
    "element": "Text",
    "name": "Explanation detail",
    "description": "How much the display says about why the car acts.",
@@ -121,6 +134,7 @@
   },
   {
    "id": "show_when",
+   "type": "categorical",
    "element": "Timing",
    "name": "When the display is shown",
    "description": "Only around the event, or for the whole drive.",
@@ -130,6 +144,7 @@
   },
   {
    "id": "confidence_indicator",
+   "type": "ordinal",
    "element": "Vehicle state",
    "name": "Confidence indicator",
    "description": "A bar showing how confident the car is about what it sees.",
@@ -139,6 +154,7 @@
   },
   {
    "id": "background_dim_alpha",
+   "type": "continuous",
    "element": "Context",
    "name": "Background dimming",
    "description": "How much the parts of the scene that do not matter are darkened.",
@@ -148,6 +164,7 @@
   },
   {
    "id": "palette_id",
+   "type": "categorical",
    "element": "Colour",
    "name": "Colour palette",
    "description": "The set of colours used for the whole display.",
@@ -4284,8 +4301,11 @@
   ]
  },
  "ab": {
-  "pairs_per_participant": 10,
-  "collect_ratings": true,
+  "tunable_per_participant": 6,
+  "categorical_per_participant": 2,
+  "scenes_per_property": 2,
+  "catch_pairs": 2,
+  "collect_ratings": false,
   "scale_points": 7,
   "scenes": {
    "trajectory_alpha": [
@@ -4390,7 +4410,6 @@
     "kobe_risky"
    ]
   },
-  "repeats": 3,
   "no_display": true
  },
  "comprehension": [

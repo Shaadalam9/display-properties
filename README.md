@@ -2,8 +2,9 @@
 
 A crowdsourced study to decide which visual properties of an automated-vehicle (AV) explanation display are worth
 personalising. Participants watch real dashcam clips with an explanation display drawn on top, rank the display's
-properties and compare clips that differ in one property. Pre-registered rules then select about four properties,
-their usable ranges, and fixed values for everything else. A follow-up preference optimisation tunes only those.
+properties and compare clips that differ in one property. A pre-registered rule then selects up to four properties on
+which people hold stable, different preferences, and fixed values for everything else. A follow-up preference
+optimisation tunes only those.
 
 <p align="center">
   <img src="docs/figures/display.gif" width="640" alt="The default display in Valencia: the planned path on the road and markers above the pedestrians the car reacts to">
@@ -107,6 +108,12 @@ videos instead.
 |---|---|---|
 | **Colour palette**<br>`palette_id` | The set of colours used for the whole display.<br><br>Low: Standard (yellow and cyan)<br>High: Another palette: colour-blind friendly, minimal, or high-contrast | <img src="docs/figures/properties/palette_id.gif" width="420" alt="Colour palette: Standard (yellow and cyan) vs Another palette: colour-blind friendly, minimal, or high-contrast"> |
 
+Nine of the properties are tunable (continuous: path visibility, width, length and certainty colour, highlight
+strength, marker size, background dimming; ordinal: explanation detail, confidence indicator) and can be selected for
+the optimisation. The other eight are categorical (on/off or a choice between styles) and are settled by the majority
+preference. Each is tested at two levels, so the study shows whether a property is worth tuning, not where within its
+range people's preferences lie.
+
 Four of these are the parameters of the follow-up preference study (highlight strength, path visibility, background
 dimming and colour palette), with the same ranges and defaults, so that study's choice of parameters can be checked
 against what participants rank here. The palette has three alternatives to the standard one; each participant sees
@@ -161,9 +168,8 @@ flowchart TD
     B --> C[Comprehension:<br/>clip stops, 'what will the car do next?']
     C --> D[Baseline clip + open question]
     D --> E[Task A: rank properties<br/>13 Best-Worst Scaling trials]
-    E --> F[Task B: 10 A/B pairs<br/>+ display vs no display]
-    F --> G[3 pairs repeated, sides swapped]
-    G --> H[Final comment, completion code]
+    E --> F[Task B: 17 A/B pairs<br/>6 tunable properties in 2 scenes each,<br/>2 categorical, 2 catch pairs,<br/>display vs no display]
+    F --> H[Final comment, completion code]
 ```
 
 1. **Consent and demographics:** age, nationality and country of residence, gender, driving licence, car use,
@@ -177,10 +183,12 @@ flowchart TD
 5. **Ranking (Task A):** Best-Worst Scaling. Each trial shows 4 properties; the participant picks the most and least
    important for understanding what the car is doing and why. Each property comes with a looping preview of its two
    levels side by side, so it is judged from what it looks like and not only from its name.
-6. **A/B pairs (Task B):** for 10 properties, the same situation with the property at its low and high level (sides
-   randomised): did you notice a difference, which would you prefer while riding, how much does it matter (1–7), and
-   for each clip understanding, perceived safety and mental load (1–7). Mixed in: the display vs the same clip without
-   a display. At the end, 3 pairs again with the sides swapped, to measure consistency.
+6. **A/B pairs (Task B):** the same situation with a property at its low and high level (sides randomised): did you
+   notice a difference, which display would you prefer while riding (A clearly, A slightly, no preference, B slightly,
+   B clearly), and how much does the difference matter (1–7). Each participant compares 6 of the 9 tunable properties,
+   **each in two different scenes**, so that their two answers show whether they hold a stable preference or do not
+   care; and 2 of the 8 categorical properties in one scene. Mixed in: **2 catch pairs** with the same clip on both
+   sides (reporting a difference there is a false alarm) and the display vs the same clip without a display.
 7. Five attention checks between the trials; three wrong answers end the study, with a partial payment.
 
 <table>
@@ -347,23 +355,51 @@ uv run python analysis.py --data data/entries.jsonl
 
 ### Outputs
 Outputs go to `_output/` (not in git, as they hold personal data):
-* `participants.csv`: every participant: finished, attention answers, questionnaire scores, repeat consistency,
-  whether they preferred no display, comprehension, excluded and why. IP addresses appear only as placeholders
+* `participants.csv`: every participant: finished, attention answers, questionnaire scores, false alarms in the catch
+  pairs, whether they preferred no display, comprehension, excluded and why. IP addresses appear only as placeholders
   (0.0.0.1, 0.0.0.2, ...).
-* `summary.csv`: per property the BWS score with bootstrap CI, share noticing, preference split, importance, rating
-  differences with Wilcoxon tests, comprehension after the low vs the high clip (Fisher's exact test), the correlation
+* `summary.csv`: per property its type, the BWS score with bootstrap CI, noticing (raw and minus the false-alarm
+  rate), the preference split (high, low, none) and majority, importance, the heterogeneity H, the score, the
+  probability of being selected, comprehension after the low vs the high clip (Fisher's exact test), the correlation
   of choosing the high level with each questionnaire score, and its status.
 * `subgroups.csv`: per property, noticing and preference in calm vs risky scenes, in clips from the participant's own
   country vs elsewhere, and (colour-dependent properties) with vs without a colour vision deficiency.
-* `redundant.csv`, `open_answers.csv` (for thematic coding of Task C) and `report.md`, with the selected properties
-  and where every other one stopped.
+* `open_answers.csv` (for thematic coding of Task C) and `report.md`, with the selected properties and where every
+  other one stopped.
 
-### Selection rules
-Every property gets a status saying where it stopped: `not noticed`, `does not matter`, `consensus: fix at low/high`,
-`redundant with …`, `eligible, below cut-off`, or `selected`. A property is selected when it is noticed by at least
-70% of participants, is in the top half by BWS score or changes a rating, has no clear majority preference (at most
-75%), is not redundant with a higher-ranked property (|r| < 0.70), and is among the top 4 by BWS score. Set the
-thresholds in the pilot, then pre-register them.
+### Selection rule
+The rule follows the review by Mark Colley (2026-11-09). A property worth personalising is one that people notice,
+consider important, and on which they hold **stable, different** preferences: a 50/50 split alone cannot tell that
+from people who do not care.
+
+1. **Tunable only.** Continuous and ordinal properties (`type` in `properties.json`) can be tuned by the follow-up
+   optimisation. Categorical ones (on/off, a choice between styles) are settled by the majority preference instead.
+2. **Noticed.** The share who noticed the difference, minus the false-alarm rate from the catch pairs, is at least
+   `noticed_min_share` (70%).
+3. **People differ.** The heterogeneity H is the intraclass correlation of a participant's choices in the two scenes
+   (participants who chose a level in both). It is about 0 when people do not care or all prefer the same level, and
+   about 1 when they hold stable, opposite preferences. It must be at least `heterogeneity_min` (0.30).
+4. **Ranked.** Among the remaining properties, importance (the BWS score rescaled to 0..1) × H ranks them, and the top
+   `select_n` (4) are selected; fewer if fewer qualify. A bootstrap over participants gives each property's
+   probability of being selected, reported next to the choice.
+
+Every property gets a status: `selected`, `eligible, below cut-off`, `people agree: fix at low/high`, `categorical:
+settle at low/high` or `not noticed`.
+
+**Error rates and sample size.** `simulate.py` builds populations with properties of three kinds (consensus, two
+stable user types, indifference), indifferent responders, a redundant pair and false alarms, and computes the right
+answer from a large virtual population. Across 80 simulated studies per size, each with a new population:
+
+| Usable participants | Picked a wrong property | Clearly wrong (far from every cut-off) | Missed a right one | Exactly right |
+|---|---|---|---|---|
+| 300 | 45% | 20% | 10% | 51% |
+| 450 | 26% | 6% | 12% | 62% |
+| 600 | 18% | 5% | 8% | 78% |
+| 800 | 20% | 5% | 10% | 70% |
+| 1000 | 18% | 4% | 14% | 71% |
+
+The errors level off at about 600 usable participants; what remains are properties close to a cut-off. Fix the
+thresholds on the pilot (under its own `study_id`), then pre-register the rule, these error rates and N.
 
 ### Configuration
 Settings are read from `config`, secrets from `secret`; create them from `default.config` and `default.secret` (if
@@ -371,7 +407,8 @@ there is no `config`, `default.config` is used).
 * `path_data`, `files_heroku`, `download_data`: where the data is (and, with MongoDB, whether to export it first;
   needs `mongoexport` and `mongodb_uri` in `secret`).
 * `bws_items_per_trial`, `bws_appearances_per_item`, `bws_design_versions`: the BWS design.
-* `ab_pairs_per_participant` (10), `ab_repeats` (3), `ab_no_display`, `ab_collect_ratings`, `comprehension`,
+* `ab_tunable_per_participant` (6), `ab_scenes_per_property` (2), `ab_categorical_per_participant` (2),
+  `ab_catch_pairs` (2), `ab_no_display`, `ab_collect_ratings` (the three per-clip ratings; off), `comprehension`,
   `questionnaires`: the parts of the study.
 * `ab_max_scenes_per_property` (4): scenes each property's A/B pair can use, picked to mix calm and risky scenes and
   countries (0 = every scene where it passed the check). Fewer scenes means fewer clips to host.
@@ -379,15 +416,14 @@ there is no `config`, `default.config` is used).
 * `colour_properties_without_cvd`: leave participants with a colour vision deficiency out of the main results of
   `colour_dependent` properties (they are still compared in `subgroups.csv`).
 * Exclusions: `exclude_debug`, `exclude_unfinished`, `exclude_incomplete` (a finished record must hold the consent,
-  every BWS trial and every A/B pair), `attention_max_wrong`, `min_median_bws_rt_ms`, `min_repeat_consistency`,
+  every BWS trial and every A/B pair), `attention_max_wrong`, `min_median_bws_rt_ms`, `max_catch_noticed` (off),
   `max_hidden_ab_share`, and `exclude_duplicate_ip` (keep only the first participant from each IP address, as in
   [Bazilinskyy et al., 2022](https://doi.org/10.54941/ahfe1002444); only a session that ended, finished or stopped by
   the attention checks, counts as first, so a participant who reloads the page and finishes under a new code is kept).
 * `study_id` and `design_versions`: records with another `study_id` are left out. When the kept participants saw more
   than one version of `design.json` (its `generated_at`), the analysis stops until `design_versions` lists the
   version(s) to analyse. Give the pilot its own `study_id`, so its data stay out of the main analysis.
-* Selection rules: `select_n`, `noticed_min_share`, `matters_top_fraction`, `disagreement_max_majority_share`,
-  `redundancy_min_abs_r`.
+* Selection rule: `select_n`, `noticed_min_share`, `heterogeneity_min`, `selection_bootstrap`.
 
 ### Testing without real data
 `simulate.py` writes synthetic participants with a known truth in the same format as the server:

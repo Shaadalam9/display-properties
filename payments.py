@@ -33,9 +33,9 @@ def payment_status(rec: dict) -> str:
     return "none"
 
 
-def payments(records: list[dict], config: dict, n_items: int | None = None) -> pd.DataFrame:
-    """``n_items`` (the number of properties) adds the "incomplete data" flag."""
-    _, exclusions = apply_exclusions(records, config, n_items)
+def payments(records: list[dict], config: dict, properties: list[dict] | None = None) -> pd.DataFrame:
+    """``properties`` (the screened-in ones) adds the "incomplete data" flag."""
+    _, exclusions = apply_exclusions(records, config, properties)
     reasons = exclusions.set_index("pid")["reasons"]
     # the payment does not depend on these: they are flags for the researcher's own check
     review = {pid: "; ".join(r for r in text.split("; ") if r and r != "did not finish"
@@ -56,7 +56,7 @@ def main() -> None:
     args = parser.parse_args()
 
     records = rows_to_records(read_rows([resolve(f) for f in args.data]), config["attention_max_wrong"])
-    table = payments(records, config, len(load_properties(config)))
+    table = payments(records, config, load_properties(config))
     out = resolve(args.out)
     out.mkdir(parents=True, exist_ok=True)
     table.to_csv(out / "payments.csv", index=False)

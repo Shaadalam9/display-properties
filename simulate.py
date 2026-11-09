@@ -3,12 +3,22 @@
     uv run python simulate.py --n 150
     uv run python analysis.py --data data/simulated/entries.jsonl --out _output/simulated
 
-Each property gets a true importance, a probability of being noticed and a population
-share preferring its high level. Participants answer the BWS trials of a design
-version (best = highest noisy utility, worst = lowest) and the A/B pairs from those
-truths. The output has the shape the server stores (``{"data": [jsPsych rows]}`` per
-line), so the whole path from raw rows to the selection is checked before any real
-data exists. The truth is written to data/simulated/truth.json.
+Each property gets a true importance (drives the BWS answers and the importance rating), a
+probability of being noticed, and a preference structure of one of three kinds:
+
+* consensus: nearly everyone leans the same way;
+* types: two stable groups of people who prefer opposite levels (what personalisation is for);
+* indifferent: nobody cares, so answers are noise around "no preference".
+
+A participant's answer in a scene is their own lean on the property plus noise from scene to
+scene, cut into the graded scale (-2 .. 2 towards the high level). Some participants are
+indifferent responders who answer around "no preference" whatever they see, two properties
+share each participant's lean (a redundant pair), and catch pairs of two identical clips draw
+false alarms. The truth (noticing after false alarms, expected BWS score, heterogeneity H and
+the properties the rule should select) is computed from a large virtual population, so a
+simulated study's selection can be compared with it (``true_selection``). The output has the
+shape the server stores (``{"data": [jsPsych rows]}`` per line); the truth is written to
+data/simulated/truth.json.
 """
 
 from __future__ import annotations
@@ -30,26 +40,127 @@ people prefer more information (Hartwich et al. 2021). Used to check the analysi
 HIGH_CRITICALITY_EFFECT = {"explanation_detail": 1.5}
 """Log-odds change in choosing the high level in high- vs low-criticality scenes."""
 
-COLOUR_DEPENDENT = ("path_uncertainty", "class_colours")
+COLOUR_DEPENDENT = ("path_uncertainty", "class_colours", "palette_id")
 CVD_NOTICE_FACTOR = 0.3  # people with a colour vision deficiency notice colour-only changes this much as often
 COUNTRIES = ("US", "EG", "NL", "IN")
+SCENE_NOISE = 0.6          # sd of a participant's answer from scene to scene, on the latent scale
+INDIFFERENT_SHARE = 0.15   # participants who answer around "no preference" whatever they see
+FALSE_ALARM = 0.10         # chance of reporting a difference that is not there
+KINDS = ("consensus", "types", "indifferent")
 
 
-def simulate(design: dict, n: int, seed: int) -> tuple[list[dict], dict]:
-    """Return documents ``{"data": rows}`` (one per participant) and the truth."""
-    rng = np.random.default_rng(seed)
-    props = [p["id"] for p in design["properties"]]
-    truth = {
-        p: {
+def graded(latent: float) -> int:
+    """Latent lean towards the high level -> -2 .. 2."""
+    return int(np.clip(np.round(latent / 0.8), -2, 2))
+
+
+def person_lean(rng: np.random.Generator, truth_p: dict) -> float:
+    """A participant's own, stable lean towards the high level on one property."""
+    kind = truth_p["kind"]
+    if kind == "consensus":
+        return truth_p["mean"] + rng.normal(0, 0.3)
+    if kind == "types":
+        return truth_p["mean"] if rng.random() < truth_p["share_high"] else -truth_p["mean"]
+    return 0.0
+
+
+def answer(rng: np.random.Generator, lean: float, noticed: bool, indifferent: bool) -> int:
+    """Graded answer in one scene."""
+    if indifferent or not noticed:
+        return 0 if rng.random() < 0.6 else int(rng.choice([-1, 1]))
+    return graded(lean + rng.normal(0, SCENE_NOISE))
+
+
+def make_truth(props: list[str], rng: np.random.Generator) -> dict:
+    truth = {}
+    for p in props:
+        kind = str(rng.choice(KINDS, p=[0.35, 0.35, 0.30]))
+        sign = 1 if rng.random() < 0.5 else -1
+        truth[p] = {
             "importance": float(rng.normal(0, 1)),
             "notice_prob": float(rng.uniform(0.5, 0.98)),
-            "prefer_high": float(rng.uniform(0.1, 0.9)),
+            "kind": kind,
+            "mean": float(sign * rng.uniform(0.8, 1.6)) if kind == "consensus" else float(rng.uniform(0.9, 1.6)),
+            "share_high": float(rng.uniform(0.3, 0.7)),
             "trust_effect": TRUST_MODERATED.get(p, 0.0),
             "comprehension_gain": float(rng.uniform(-0.1, 0.3)),
         }
-        for p in props
-    }
-    truth["_global"] = {"prefer_no_display": 0.15, "repeat_consistency": 0.85, "cvd_share": 0.08}
+    return truth
+
+
+def population_truth(design: dict, truth: dict, config: dict, rng: np.random.Generator, n: int = 4000) -> None:
+    """Add to the truth what a study of infinite size would find: noticing after false alarms,
+    the expected BWS score and H; and the properties the rule should select."""
+    props = [p["id"] for p in design["properties"]]
+    kind_of = {p["id"]: p.get("type") for p in design["properties"]}
+    shared = truth["_global"]["redundant"]
+    bws_sum, bws_n = {p: 0.0 for p in props}, {p: 0 for p in props}
+    versions = design["bws"]["versions"]
+    for i in range(n):
+        utility = {p: truth[p]["importance"] + rng.normal(0, 0.7) for p in props}
+        shown = {p: [0, 0, 0] for p in props}
+        for items in versions[i % len(versions)]:
+            noisy = {p: utility[p] + rng.gumbel() for p in items}
+            for p in items:
+                shown[p][2] += 1
+            shown[max(noisy, key=noisy.get)][0] += 1
+            shown[min(noisy, key=noisy.get)][1] += 1
+        for p, (best, worst, k) in shown.items():
+            if k:
+                bws_sum[p] += (best - worst) / k
+                bws_n[p] += 1
+    scene_meta = {s["id"]: s for s in design["scenes"]}
+    for p in props:
+        # the same answer model as in simulate(): own lean, trust effect, and the effect of risky
+        # scenes, in two of the property's scenes
+        scenes = design["ab"]["scenes"][p]
+        first, second = [], []
+        for _ in range(n):
+            lean = person_lean(rng, truth[p]) + truth[p]["trust_effect"] * rng.normal(0, 1)
+            indifferent = rng.random() < INDIFFERENT_SHARE
+            answers = []
+            for scene in rng.permutation(scenes)[:2]:
+                critical = scene_meta.get(str(scene), {}).get("criticality") == "high"
+                shift = HIGH_CRITICALITY_EFFECT.get(p, 0.0) if critical else 0.0
+                answers.append(answer(rng, lean + shift, rng.random() < truth[p]["notice_prob"], indifferent))
+            first.append(answers[0])
+            second.append(answers[1])
+        from avprops.analysis import icc_two
+        both = [(x, y) for x, y in zip(first, second) if x != 0 and y != 0]  # as analysis._two_answers
+        truth[p]["H"] = icc_two(*(np.sign(np.array(v, float)) for v in zip(*both)))
+        truth[p]["bws_score"] = bws_sum[p] / max(bws_n[p], 1)
+        # reported noticing = noticed + false alarms among the rest; minus the false-alarm rate:
+        truth[p]["noticed_corrected"] = truth[p]["notice_prob"] * (1 - FALSE_ALARM)
+    from avprops.analysis import _selection
+    import pandas as pd
+    tunable = {p for p in props if kind_of[p] in ("continuous", "ordinal")}
+    chosen, _ = _selection(pd.Series({p: truth[p]["bws_score"] for p in props}),
+                           pd.Series({p: truth[p]["noticed_corrected"] for p in props}),
+                           pd.Series({p: truth[p]["H"] for p in props}), tunable, config)
+    truth["_global"]["selected"] = chosen
+    truth["_global"]["redundant"] = shared
+
+
+def true_selection(truth: dict) -> list[str]:
+    return truth["_global"]["selected"]
+
+
+def simulate(design: dict, n: int, seed: int, config: dict | None = None,
+             truth: dict | None = None) -> tuple[list[dict], dict]:
+    """Return documents ``{"data": rows}`` (one per participant) and the truth. Pass a
+    ``truth`` from an earlier call to simulate more studies of the same population."""
+    rng = np.random.default_rng(seed)
+    config = config or load_config()
+    props = [p["id"] for p in design["properties"]]
+    if truth is None:
+        truth = make_truth(props, rng)
+        tunable = [p["id"] for p in design["properties"] if p.get("type") in ("continuous", "ordinal")]
+        redundant = [str(x) for x in rng.choice(tunable, 2, replace=False)]
+        truth[redundant[1]].update({k: truth[redundant[0]][k] for k in ("kind", "mean", "share_high")})
+        truth["_global"] = {"prefer_no_display": 0.15, "cvd_share": 0.08, "false_alarm": FALSE_ALARM,
+                            "indifferent_share": INDIFFERENT_SHARE, "redundant": redundant}
+        population_truth(design, truth, config, np.random.default_rng(seed + 10_000))
+    shared = truth["_global"]["redundant"]
     scene_meta = {sc["id"]: sc for sc in design["scenes"]}
     variants_of = {p["id"]: p["variants"] for p in design["properties"] if p.get("variants")}
     points = design["ab"]["scale_points"]
@@ -95,40 +206,63 @@ def simulate(design: dict, n: int, seed: int) -> tuple[list[dict], dict]:
             add("bws", trial=t, items=items, best=max(noisy, key=noisy.get), worst=min(noisy, key=noisy.get),
                 rt=int(rng.integers(2500, 12000)), hidden=False)
 
-        def pair(index: int, prop: str, scene: str, level: str, noticed: bool, repeat: bool = False,
-                 levels: tuple[str, str] = ("low", "high")) -> None:
-            a_level = levels[0] if rng.random() < 0.5 else levels[1]
-            b_level = levels[1] if a_level == levels[0] else levels[0]
-            variants = variants_of.get(prop)
+        indifferent = bool(rng.random() < truth["_global"]["indifferent_share"])
+        lean = {p: person_lean(rng, truth[p]) + truth[p]["trust_effect"] * trust for p in props}
+        lean[shared[1]] = lean[shared[0]]  # the redundant pair: one lean for both
+
+        def pair(index: int, prop: str, scene: str, a_level: str, b_level: str, towards_b: int, noticed: bool,
+                 catch: bool = False, variant: str | None = None) -> None:
+            if prop == "no_display":
+                b_up = b_level == "baseline"
+            else:
+                b_up = b_level == "high"
+            level = a_level if towards_b < 0 else (b_level if towards_b > 0 else "none")
             add("ab", index=index, property=prop, scene=scene, a_level=a_level, b_level=b_level, noticed=noticed,
-                high_variant=str(rng.choice(variants)) if variants else None,
-                preferred_option="A" if level == a_level else "B", preferred_level=level, repeat=repeat,
+                high_variant=variant, catch=catch,
+                preferred_option="A" if towards_b < 0 else ("B" if towards_b > 0 else "none"),
+                preferred_level=level, preference=None if catch else (towards_b if b_up else -towards_b),
                 importance=int(np.clip(round((points + 1) / 2 + 1.2 * utility.get(prop, 0)), 1, points)),
-                ratings={lvl: {key: int(rng.integers(1, points + 1)) for key in RATING_KEYS} for lvl in levels},
                 rt=int(rng.integers(8000, 40000)), hidden=False)
 
-        answered = []
-        for k, p in enumerate(rng.permutation(props)[: design["ab"]["pairs_per_participant"]]):
-            p = str(p)
-            scene = str(rng.choice(design["ab"]["scenes"][p]))
-            notice_prob = truth[p]["notice_prob"] * (CVD_NOTICE_FACTOR if cvd and p in COLOUR_DEPENDENT else 1.0)
-            noticed = bool(rng.random() < notice_prob)
-            base = np.log(truth[p]["prefer_high"] / (1 - truth[p]["prefer_high"]))
-            critical = scene_meta.get(scene, {}).get("criticality") == "high"
-            logit = base + truth[p]["trust_effect"] * trust + (HIGH_CRITICALITY_EFFECT.get(p, 0.0) if critical else 0.0)
-            prob_high = 1 / (1 + np.exp(-logit))
-            level = ("high" if rng.random() < prob_high else "low") if noticed \
-                else ("high" if rng.random() < 0.5 else "low")
-            pair(k, p, scene, level, noticed)
-            answered.append((p, scene, level, noticed))
+        plan = []
+        kind_of = {q["id"]: q.get("type") for q in design["properties"]}
+        tunable = [q for q in props if kind_of[q] != "categorical"]
+        categorical = [q for q in props if kind_of[q] == "categorical"]
+        compared = [(str(q), design["ab"]["scenes_per_property"])
+                    for q in rng.permutation(tunable)[: design["ab"]["tunable_per_participant"]]] + \
+                   [(str(q), 1) for q in rng.permutation(categorical)[: design["ab"]["categorical_per_participant"]]]
+        for p, n_scenes in compared:
+            variant = str(rng.choice(variants_of[p])) if p in variants_of else None
+            for scene in rng.permutation(design["ab"]["scenes"][p])[:n_scenes]:
+                plan.append(("pair", p, str(scene), variant))
+        for _ in range(design["ab"]["catch_pairs"]):
+            p = str(rng.choice(props))
+            plan.append(("catch", p, str(rng.choice(design["ab"]["scenes"][p])), None))
         if design["ab"]["no_display"]:
-            none = rng.random() < truth["_global"]["prefer_no_display"]
-            pair(len(answered), "no_display", design["scenes"][0]["id"], "none" if none else "baseline", True,
-                 levels=("none", "baseline"))
-        for j, (p, scene, level, noticed) in enumerate(answered[: design["ab"]["repeats"]]):
-            same = rng.random() < truth["_global"]["repeat_consistency"]
-            pair(len(answered) + 1 + j, p, scene, level if same else ("low" if level == "high" else "high"),
-                 noticed, repeat=True)
+            plan.append(("no_display", "no_display", str(rng.choice([s["id"] for s in design["scenes"]])), None))
+        for k, j in enumerate(rng.permutation(len(plan))):
+            kind, p, scene, variant = plan[j]
+            if kind == "no_display":
+                a_level = "none" if rng.random() < 0.5 else "baseline"
+                b_level = "baseline" if a_level == "none" else "none"
+                wants = -1 if rng.random() < truth["_global"]["prefer_no_display"] else 1
+                pair(k, p, scene, a_level, b_level, wants if b_level == "baseline" else -wants, True)
+            elif kind == "catch":
+                level = "low" if rng.random() < 0.5 else "high"
+                noticed = bool(rng.random() < truth["_global"]["false_alarm"])
+                pair(k, p, scene, level, level, 0 if rng.random() < 0.7 else int(rng.choice([-1, 1])), noticed,
+                     catch=True)
+            else:
+                notice_prob = truth[p]["notice_prob"] * (CVD_NOTICE_FACTOR if cvd and p in COLOUR_DEPENDENT else 1.0)
+                saw = bool(rng.random() < notice_prob)
+                noticed = saw or bool(rng.random() < truth["_global"]["false_alarm"])
+                critical = scene_meta.get(scene, {}).get("criticality") == "high"
+                towards_high = answer(rng, lean[p] + (HIGH_CRITICALITY_EFFECT.get(p, 0.0) if critical else 0.0),
+                                      saw, indifferent)
+                a_level = "low" if rng.random() < 0.5 else "high"
+                b_level = "high" if a_level == "low" else "low"
+                pair(k, p, scene, a_level, b_level, towards_high if b_level == "high" else -towards_high, noticed,
+                     variant=variant)
         for _ in range(5):
             add("attention", correct=bool(rng.random() < 0.97))
         add("final", response={"comment": ""})
@@ -144,7 +278,7 @@ def main() -> None:
 
     config = load_config()
     design = json.loads(resolve(config["design_output"]).read_text(encoding="utf-8"))
-    documents, truth = simulate(design, args.n, args.seed)
+    documents, truth = simulate(design, args.n, args.seed, config)
 
     out = PROJECT_ROOT / "data" / "simulated"
     out.mkdir(parents=True, exist_ok=True)

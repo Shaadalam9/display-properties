@@ -36,6 +36,12 @@ def resolve(path: str | Path, root: Path = PROJECT_ROOT) -> Path:
     return path if path.is_absolute() else root / path
 
 
+# continuous and ordinal properties can be tuned by the follow-up optimisation; categorical ones
+# (on/off, a choice between styles) are settled by the majority preference instead
+PROPERTY_TYPES = ("continuous", "ordinal", "categorical")
+TUNABLE = ("continuous", "ordinal")
+
+
 def load_properties(config: dict[str, Any], root: Path = PROJECT_ROOT,
                     screened_only: bool = True) -> list[dict[str, Any]]:
     """Return the candidate properties, by default only those that passed screening."""
@@ -46,6 +52,9 @@ def load_properties(config: dict[str, Any], root: Path = PROJECT_ROOT,
         raise ValueError("property ids in the properties file must be unique")
     if screened_only:
         properties = [p for p in properties if p.get("screened_in", True)]
+    untyped = [p["id"] for p in properties if p.get("screened_in", True) and p.get("type") not in PROPERTY_TYPES]
+    if untyped:
+        raise ValueError(f"screened-in properties need a type ({', '.join(PROPERTY_TYPES)}): {', '.join(untyped)}")
     return properties
 
 

@@ -10,16 +10,20 @@ The steps mirror the study design:
    design, unless ``design_versions`` names the version(s) to analyse.
 2. Task A (BWS): per participant, (times best - times worst) / times shown for each
    property; the property's score is the mean over participants with a bootstrap CI.
-3. Task B (A/B pairs): share who noticed the difference; among those who noticed,
-   the share preferring the high level and the majority share; mean importance; and
-   the high-minus-low difference of each rating with a Wilcoxon signed-rank test.
-4. Selection: noticeable -> matters -> people disagree -> not redundant, then the top
-   ``select_n`` by BWS score. Every property gets a status saying where it stopped.
+3. Task B (A/B pairs): each participant compares some properties, each in two scenes, with a
+   graded answer (A clearly .. no preference .. B clearly). Per property: the share who noticed
+   the difference minus the false-alarm rate (noticing in catch pairs of two identical clips);
+   the preference towards the high level; mean importance; and the heterogeneity H, the
+   intraclass correlation of each participant's two answers: 0 when people do not care (their
+   answers in the two scenes agree no more than chance), 1 when they hold stable, opposite
+   preferences (review by Mark Colley, 2026-11-09).
+4. Selection: only continuous and ordinal properties can be tuned, so only they are eligible;
+   categorical ones are settled by the majority preference. Among the eligible properties that
+   are noticed (``noticed_min_share`` after the false-alarm correction) and on which people
+   differ (H at least ``heterogeneity_min``), the score importance x H ranks them (importance = the BWS score on 0..1) and the top ``select_n`` are selected. A
+   bootstrap over participants gives each property's probability of being selected.
 
 Alongside the selection:
-* consistency: share of repeated A/B pairs (sides swapped) answered with the same
-  preferred level as the first time; low consistency means apparent disagreement may
-  be noise. ``min_repeat_consistency`` can exclude participants below it;
 * display vs no display: share of participants who preferred no display at all;
 * comprehension: per property, the share answering "what will the car do next?"
   correctly after its low vs its high clip (between participants, Fisher's exact test);
@@ -41,6 +45,7 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
+from avprops.common import TUNABLE
 from avprops.crowd import mask_ips
 
 RATING_KEYS = ("understanding", "safety", "load")
@@ -54,15 +59,16 @@ def ended(rec: dict, config: dict) -> bool:
     return bool(rec.get("finished")) or wrong >= config.get("attention_fail_at", math.inf)
 
 
-def expected_trials(config: dict, n_items: int) -> tuple[int, int]:
-    """BWS trials and A/B pairs (repeats and the display vs no display pair included) that every
-    participant gets, as design.build_design and the experiment make them."""
+def expected_trials(config: dict, properties: list[dict]) -> tuple[int, int]:
+    """BWS trials and A/B pairs (catch pairs and the display vs no display pair included) that
+    every participant gets, as design.build_design and the experiment make them."""
+    from avprops.design import ab_counts
+    n_items = len(properties)
     k = min(config["bws_items_per_trial"], n_items)
     bws = math.ceil(n_items * config["bws_appearances_per_item"] / k)
-    pairs = config["ab_pairs_per_participant"]
-    pairs = n_items if pairs in (0, None) else min(pairs, n_items)
-    repeats = min(int(config.get("ab_repeats", 0)), pairs)
-    return bws, pairs + repeats + int(bool(config.get("ab_no_display", False)))
+    tunable, categorical = ab_counts(config, properties)
+    pairs = tunable * int(config["ab_scenes_per_property"]) + categorical
+    return bws, pairs + int(config.get("ab_catch_pairs", 0)) + int(bool(config.get("ab_no_display", False)))
 
 
 def missing_data(rec: dict, expected: tuple[int, int]) -> str:
@@ -78,9 +84,9 @@ def missing_data(rec: dict, expected: tuple[int, int]) -> str:
 
 
 def apply_exclusions(records: list[dict], config: dict,
-                     n_items: int | None = None) -> tuple[list[dict], pd.DataFrame]:
+                     properties: list[dict] | None = None) -> tuple[list[dict], pd.DataFrame]:
     """Return the kept records and a table of every participant with the reason excluded.
-    With ``n_items`` (the number of properties) a finished record must also hold every trial."""
+    With ``properties`` a finished record must also hold every trial."""
     kept, rows = [], []
     # a later participant from an address whose earlier session ended took part twice (or shares
     # a device): keep the first one only. A session left halfway does not count, so a participant
@@ -93,7 +99,7 @@ def apply_exclusions(records: list[dict], config: dict,
                 later_same_ip.add(id(rec))
             if ended(rec, config):
                 seen.add(rec["ip"])
-    expected = expected_trials(config, n_items) if n_items else None
+    expected = expected_trials(config, properties) if properties else None
     versions = config.get("design_versions") or []
     for rec in records:
         reasons = []
@@ -120,27 +126,24 @@ def apply_exclusions(records: list[dict], config: dict,
         ab = rec.get("ab", [])
         if ab and np.mean([bool(p.get("hidden")) for p in ab]) > config["max_hidden_ab_share"]:
             reasons.append("tab hidden during too many A/B pairs")
-        consistency = repeat_consistency(rec)
-        if config.get("min_repeat_consistency", 0) > 0 and consistency is not None \
-                and consistency < config["min_repeat_consistency"]:
-            reasons.append(f"repeated pairs answered consistently in {consistency:.0%}")
+        false_alarms, n_catch = catch_noticed(rec)
+        if config.get("max_catch_noticed") is not None and n_catch and false_alarms > config["max_catch_noticed"]:
+            reasons.append(f"noticed a difference in {false_alarms} of {n_catch} identical pairs")
         rows.append({"pid": rec.get("pid"), "excluded": bool(reasons), "reasons": "; ".join(reasons)})
         if not reasons:
             kept.append(rec)
     return kept, pd.DataFrame(rows, columns=["pid", "excluded", "reasons"])
 
 
-def first_pairs(rec: dict) -> list[dict]:
-    """The A/B pairs of the properties, without repeats and the no-display pair."""
-    return [p for p in rec.get("ab", []) if not p.get("repeat") and p["property"] != "no_display"]
+def property_pairs(rec: dict) -> list[dict]:
+    """The A/B pairs of the properties, without the catch pairs and the no-display pair."""
+    return [p for p in rec.get("ab", []) if not p.get("catch") and p["property"] != "no_display"]
 
 
-def repeat_consistency(rec: dict) -> float | None:
-    """Share of repeated pairs where the same level was preferred both times."""
-    first = {p["property"]: p for p in first_pairs(rec)}
-    same = [p["preferred_level"] == first[p["property"]]["preferred_level"]
-            for p in rec.get("ab", []) if p.get("repeat") and p["property"] in first]
-    return float(np.mean(same)) if same else None
+def catch_noticed(rec: dict) -> tuple[int, int]:
+    """(catch pairs in which a difference was reported, catch pairs shown)."""
+    catches = [p for p in rec.get("ab", []) if p.get("catch")]
+    return sum(bool(p["noticed"]) for p in catches), len(catches)
 
 
 def prefers_no_display(rec: dict) -> bool | None:
@@ -209,33 +212,87 @@ def has_cvd(rec: dict) -> bool:
     return (rec.get("demographics") or {}).get("colour_vision_deficiency") == "Yes"
 
 
+def icc_two(first: np.ndarray, second: np.ndarray) -> float:
+    """One-way intraclass correlation of two answers per participant: the share of the
+    answers' variance that lies between participants. 0 when a participant's two answers
+    agree no more than chance (indifference, noise), 1 when everyone answers consistently
+    but people differ (stable, opposite preferences). For a binary choice it equals the
+    heterogeneity H of the review; NaN with fewer than 5 participants."""
+    n = len(first)
+    if n < 5:
+        return np.nan
+    means = (first + second) / 2
+    ms_between = 2 * np.sum((means - means.mean()) ** 2) / (n - 1)
+    ms_within = np.sum((first - means) ** 2 + (second - means) ** 2) / n
+    total = ms_between + ms_within
+    return float((ms_between - ms_within) / total) if total > 0 else 0.0
+
+
+def false_alarm_rate(records: list[dict]) -> float:
+    """Share of catch pairs (two identical clips) in which a difference was reported."""
+    counts = [catch_noticed(rec) for rec in records]
+    shown = sum(n for _, n in counts)
+    return sum(k for k, _ in counts) / shown if shown else 0.0
+
+
+def _pairs_by_property(records: list[dict], prop_ids: list[str],
+                       skip_cvd_for: set[str]) -> dict[str, list[tuple[int, dict]]]:
+    """(participant index, pair) per property; colour vision deficiency left out where asked."""
+    by_prop: dict[str, list[tuple[int, dict]]] = {p: [] for p in prop_ids}
+    for i, rec in enumerate(records):
+        for pair in property_pairs(rec):
+            if pair["property"] in by_prop and not (pair["property"] in skip_cvd_for and has_cvd(rec)):
+                by_prop[pair["property"]].append((i, pair))
+    return by_prop
+
+
+def _two_answers(entries: list[tuple[int, dict]]) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Participants who chose a level in both scenes of a property: their index and the two
+    choices (1 the high level, -1 the low level). Only the choice counts, as in the review's H
+    for a binary choice: people who all prefer the same level, some more strongly than others,
+    agree and have nothing to personalise; "no preference" answers count in the preference
+    shares but not here."""
+    answers: dict[int, list[float]] = {}
+    for i, pair in entries:
+        if pair.get("preference") is not None:
+            answers.setdefault(i, []).append(float(np.sign(pair["preference"])))
+    both = [(i, a[0], a[1]) for i, a in answers.items() if len(a) >= 2 and a[0] != 0 and a[1] != 0]
+    if not both:
+        return np.zeros(0, int), np.zeros(0), np.zeros(0)
+    idx, first, second = zip(*both)
+    return np.array(idx), np.array(first), np.array(second)
+
+
 def ab_summary(records: list[dict], prop_ids: list[str], skip_cvd_for: set[str] | None = None) -> pd.DataFrame:
     """A/B results per property. Participants who report a colour vision deficiency are
     left out of the properties in ``skip_cvd_for``."""
-    skip_cvd_for = skip_cvd_for or set()
-    by_prop: dict[str, list[dict]] = {p: [] for p in prop_ids}
-    for rec in records:
-        for pair in first_pairs(rec):
-            if pair["property"] in by_prop and not (pair["property"] in skip_cvd_for and has_cvd(rec)):
-                by_prop[pair["property"]].append(pair)
-
+    by_prop = _pairs_by_property(records, prop_ids, skip_cvd_for or set())
+    false_alarms = false_alarm_rate(records)
     rows = {}
-    for prop, pairs in by_prop.items():
-        noticed = [p for p in pairs if p["noticed"]]
-        prefer_high = [p["preferred_level"] == "high" for p in noticed]
-        share_high = float(np.mean(prefer_high)) if prefer_high else np.nan
+    for prop, entries in by_prop.items():
+        pairs = [pair for _, pair in entries]
+        levels = [p["preferred_level"] for p in pairs]
+        chosen = [lv for lv in levels if lv in ("high", "low")]
+        share_high = chosen.count("high") / len(chosen) if chosen else np.nan
+        noticed = float(np.mean([bool(p["noticed"]) for p in pairs])) if pairs else np.nan
+        _, first, second = _two_answers(entries)
         row = {
             "ab_n": len(pairs),
-            "noticed_share": float(np.mean([p["noticed"] for p in pairs])) if pairs else np.nan,
-            "pref_n": len(noticed),
-            "prefer_high_share": share_high,
-            "majority_share": max(share_high, 1 - share_high) if prefer_high else np.nan,
-            "majority_level": ("high" if share_high >= 0.5 else "low") if prefer_high else "",
+            "noticed_share": noticed,
+            "noticed_corrected": noticed - false_alarms if pairs else np.nan,
+            "prefer_high_share": levels.count("high") / len(levels) if levels else np.nan,
+            "prefer_low_share": levels.count("low") / len(levels) if levels else np.nan,
+            "no_preference_share": levels.count("none") / len(levels) if levels else np.nan,
+            "majority_level": ("high" if share_high >= 0.5 else "low") if chosen else "",
+            "majority_share": max(share_high, 1 - share_high) if chosen else np.nan,
+            "preference_mean": float(np.mean([p["preference"] for p in pairs if p.get("preference") is not None]))
+            if pairs else np.nan,
             "importance_mean": float(np.mean([p["importance"] for p in pairs])) if pairs else np.nan,
+            "H": icc_two(first, second),
+            "H_n": len(first),
         }
         for key in RATING_KEYS:
-            diffs = [p["ratings"]["high"][key] - p["ratings"]["low"][key]
-                     for p in pairs if p.get("ratings")]
+            diffs = [p["ratings"]["high"][key] - p["ratings"]["low"][key] for p in pairs if p.get("ratings")]
             row[f"{key}_diff_mean"] = float(np.mean(diffs)) if diffs else np.nan
             row[f"{key}_diff_p"] = _wilcoxon_p(diffs)
         rows[prop] = row
@@ -269,7 +326,8 @@ def preference_by_score(records: list[dict], prop_ids: list[str], questionnaires
         row = {}
         for q in questionnaires:
             pairs = [(questionnaire_scores(rec, [q])[q["id"]], p["preferred_level"] == "high")
-                     for rec in records for p in first_pairs(rec) if p["property"] == prop and p["noticed"]]
+                     for rec in records for p in property_pairs(rec)
+                     if p["property"] == prop and p["noticed"] and p["preferred_level"] in ("high", "low")]
             pairs = [(score, high) for score, high in pairs if not np.isnan(score)]
             r = p = np.nan
             chose = [high for _, high in pairs]
@@ -322,14 +380,14 @@ def subgroup_summary(records: list[dict], properties: list[dict], scenes: list[d
         for factor in factors:
             groups: dict[str, list[dict]] = {}
             for rec in records:
-                for pair in first_pairs(rec):
+                for pair in property_pairs(rec):
                     if pair["property"] == prop["id"]:
                         group = _group_of(factor, rec, pair, scene_meta)
                         if group:
                             groups.setdefault(group, []).append(pair)
             stats_by_group, seen_by_group = {}, {}
             for group, pairs in sorted(groups.items()):
-                noticed = [p for p in pairs if p["noticed"]]
+                noticed = [p for p in pairs if p["noticed"] and p["preferred_level"] in ("high", "low")]
                 high = sum(p["preferred_level"] == "high" for p in noticed)
                 stats_by_group[group] = (len(noticed), high)
                 seen_by_group[group] = (len(pairs), len(noticed))
@@ -349,61 +407,85 @@ def subgroup_summary(records: list[dict], properties: list[dict], scenes: list[d
                                        "pref_n", "prefer_high_share", "p_prefer_high_differs"])
 
 
-def redundant_pairs(individual: pd.DataFrame, min_abs_r: float, min_n: int = 10) -> pd.DataFrame:
-    """Property pairs whose individual BWS scores correlate strongly across participants."""
-    rows = []
-    cols = list(individual.columns)
-    for i, a in enumerate(cols):
-        for b in cols[i + 1:]:
-            both = individual[[a, b]].dropna()
-            if len(both) < min_n or both[a].std() == 0 or both[b].std() == 0:
-                continue
-            r = float(np.corrcoef(both[a], both[b])[0, 1])
-            if abs(r) >= min_abs_r:
-                rows.append({"property_a": a, "property_b": b, "r": r, "n": len(both)})
-    return pd.DataFrame(rows, columns=["property_a", "property_b", "r", "n"])
+def _selection(bws: pd.Series, noticed: pd.Series, heterogeneity: pd.Series, tunable: set[str],
+               config: dict) -> tuple[list[str], pd.Series]:
+    """The selected properties and every property's score (importance x H; NaN if ineligible)."""
+    importance = (bws.clip(-1, 1) + 1) / 2
+    score = importance * heterogeneity.clip(lower=0).fillna(0)
+    eligible = [p for p in bws.index if p in tunable and noticed.get(p, np.nan) >= config["noticed_min_share"]
+                and heterogeneity.get(p, np.nan) >= config.get("heterogeneity_min", 0.0)]
+    score = score.where(score.index.isin(eligible))
+    chosen = list(score.dropna().sort_values(ascending=False).index[:config["select_n"]])
+    return chosen, score
 
 
-def select_properties(summary: pd.DataFrame, redundant: pd.DataFrame, config: dict) -> pd.DataFrame:
-    """Apply the pre-registered rules; add a ``status`` column and the final ``selected`` flag."""
-    summary = summary.sort_values("bws_score", ascending=False).copy()
-    n_top = int(np.ceil(len(summary) * config["matters_top_fraction"]))
-    top = set(summary.index[:n_top])
-    alpha = 0.05
+def selection_probability(records: list[dict], individual: pd.DataFrame, prop_ids: list[str],
+                          tunable: set[str], skip_cvd_for: set[str], config: dict) -> pd.Series:
+    """Share of bootstrap samples of participants in which each property is selected."""
+    n_boot = int(config.get("selection_bootstrap", 0))
+    if not n_boot or len(records) < 2:
+        return pd.Series(np.nan, index=prop_ids)
+    n = len(records)
+    bws = individual.reindex([r["pid"] for r in records])[prop_ids].to_numpy()
+    by_prop = _pairs_by_property(records, prop_ids, skip_cvd_for)
+    noticed_k, noticed_n = np.zeros((n, len(prop_ids))), np.zeros((n, len(prop_ids)))
+    for j, prop in enumerate(prop_ids):
+        for i, pair in by_prop[prop]:
+            noticed_n[i, j] += 1
+            noticed_k[i, j] += bool(pair["noticed"])
+    answers = {prop: _two_answers(by_prop[prop]) for prop in prop_ids}
+    catch = np.array([catch_noticed(rec) for rec in records], float)
+    rng = np.random.default_rng(config.get("bootstrap_seed", 0))
+    counts = pd.Series(0, index=prop_ids)
+    for _ in range(n_boot):
+        weight = np.bincount(rng.integers(0, n, n), minlength=n).astype(float)
+        shown = (~np.isnan(bws)) * weight[:, None]
+        bws_mean = pd.Series(np.nansum(np.nan_to_num(bws) * weight[:, None], axis=0) / np.maximum(shown.sum(0), 1),
+                             index=prop_ids)
+        false_alarms = (weight @ catch[:, 0]) / (weight @ catch[:, 1]) if weight @ catch[:, 1] else 0.0
+        noticed = pd.Series((weight @ noticed_k) / np.maximum(weight @ noticed_n, 1) - false_alarms, index=prop_ids)
+        heterogeneity = {}
+        for prop, (idx, first, second) in answers.items():
+            reps = weight[idx].astype(int) if len(idx) else np.zeros(0, int)
+            heterogeneity[prop] = icc_two(np.repeat(first, reps), np.repeat(second, reps))
+        chosen, _ = _selection(bws_mean, noticed, pd.Series(heterogeneity), tunable, config)
+        counts[chosen] += 1
+    return counts / n_boot
 
-    partners: dict[str, set[str]] = {}
-    for row in redundant.itertuples():
-        partners.setdefault(row.property_a, set()).add(row.property_b)
-        partners.setdefault(row.property_b, set()).add(row.property_a)
 
-    status, chosen = {}, []
+def select_properties(summary: pd.DataFrame, properties: list[dict], config: dict) -> pd.DataFrame:
+    """Apply the pre-registered rule; add ``eligible``, ``score``, ``status`` and ``selected``."""
+    kind = {p["id"]: p.get("type") for p in properties}
+    tunable = {p for p, k in kind.items() if k in TUNABLE}
+    chosen, score = _selection(summary["bws_score"], summary["noticed_corrected"], summary["H"], tunable, config)
+    summary = summary.copy()
+    summary["type"] = pd.Series(kind)
+    summary["eligible"] = summary.index.isin(score.dropna().index)
+    summary["score"] = score
+    status = {}
     for prop, row in summary.iterrows():
-        rating_effect = any(row.get(f"{k}_diff_p", np.nan) < alpha for k in RATING_KEYS)
-        if not row["noticed_share"] >= config["noticed_min_share"]:
-            status[prop] = "not noticed"
-        elif prop not in top and not rating_effect:
-            status[prop] = "does not matter"
-        elif pd.isna(row["majority_share"]):
-            status[prop] = "no preference data"
-        elif row["majority_share"] > config["disagreement_max_majority_share"]:
-            status[prop] = f"consensus: fix at {row['majority_level']}"
-        elif partners.get(prop, set()) & set(chosen):
-            status[prop] = "redundant with " + ", ".join(sorted(partners[prop] & set(chosen)))
-        elif len(chosen) < config["select_n"]:
-            chosen.append(prop)
+        if prop in chosen:
             status[prop] = "selected"
+        elif not row["noticed_corrected"] >= config["noticed_min_share"]:
+            status[prop] = "not noticed"
+        elif prop not in tunable:
+            status[prop] = f"categorical: settle at {row['majority_level']}" if row["majority_level"] \
+                else "categorical: no preference data"
+        elif not row["H"] >= config.get("heterogeneity_min", 0.0):
+            status[prop] = f"people agree: fix at {row['majority_level']}" if row["majority_level"] \
+                else "people agree: no preference data"
         else:
             status[prop] = "eligible, below cut-off"
     summary["status"] = pd.Series(status)
     summary["selected"] = summary["status"] == "selected"
-    return summary
+    return summary.sort_values(["selected", "score", "bws_score"], ascending=False)
 
 
 def analyse(records: list[dict], properties: list[dict], config: dict,
             questionnaires: list[dict] | None = None, scenes: list[dict] | None = None) -> dict[str, Any]:
     questionnaires = questionnaires or []
     prop_ids = [p["id"] for p in properties]
-    kept, exclusions = apply_exclusions(records, config, len(prop_ids))
+    kept, exclusions = apply_exclusions(records, config, properties)
     # a design.json made again (another generated_at) can assign other trials: never pool
     # participants of different versions without saying which ones belong to the study
     versions = sorted({str(r.get("design_generated_at")) for r in kept})
@@ -419,13 +501,15 @@ def analyse(records: list[dict], properties: list[dict], config: dict,
     summary = summary.join(comprehension_summary(kept, prop_ids))
     summary = summary.join(preference_by_score(kept, prop_ids, questionnaires))
     summary.insert(0, "name", [next(p["name"] for p in properties if p["id"] == i) for i in summary.index])
-    redundant = redundant_pairs(individual, config["redundancy_min_abs_r"])
-    summary = select_properties(summary, redundant, config)
+    summary = select_properties(summary, properties, config)
+    tunable = {p["id"] for p in properties if p.get("type") in TUNABLE}
+    summary["p_selected"] = selection_probability(kept, individual, prop_ids, tunable, skip_cvd, config)
     participants = pd.DataFrame([{
         "pid": r["pid"], "ip": r.get("ip"), "finished": r.get("finished"), "debug": r.get("debug"),
         "attention_wrong": (r.get("attention") or {}).get("wrong"),
-        "bws_trials": len(r.get("bws", [])), "ab_pairs": len(first_pairs(r)),
-        "repeat_consistency": repeat_consistency(r), "prefers_no_display": prefers_no_display(r),
+        "bws_trials": len(r.get("bws", [])), "ab_pairs": len(property_pairs(r)),
+        "catch_noticed": catch_noticed(r)[0], "catch_pairs": catch_noticed(r)[1],
+        "prefers_no_display": prefers_no_display(r),
         "comprehension_correct": (float(np.mean([bool(c["correct"]) for c in r["comprehension"]]))
                                   if r.get("comprehension") else None),
         "country_residence": (r.get("demographics") or {}).get("country_residence"),
@@ -438,14 +522,12 @@ def analyse(records: list[dict], properties: list[dict], config: dict,
         "n_records": len(records),
         "n_kept": len(kept),
         "participants": participants,
-        "repeat_consistency": float(kept_rows["repeat_consistency"].dropna().mean())
-        if kept_rows["repeat_consistency"].notna().any() else np.nan,
+        "false_alarm_rate": false_alarm_rate(kept),
         "prefers_no_display": float(kept_rows["prefers_no_display"].dropna().astype(float).mean())
         if kept_rows["prefers_no_display"].notna().any() else np.nan,
         "exclusions": exclusions,
         "summary": summary,
         "subgroups": subgroup_summary(kept, properties, scenes or []),
-        "redundant": redundant,
         "open_answers": pd.DataFrame(
             [{"pid": r["pid"], "baseline": (r.get("open_question") or {}).get("text", ""),
               "final_comment": r.get("final_comment", "")} for r in kept],

@@ -8,10 +8,11 @@ With ``download_data`` true in config, the MongoDB collection is first exported 
 the first of ``files_heroku`` (needs mongoexport and ``mongodb_uri`` in secret).
 
 Writes to the output folder:
-    participants.csv   every participant: finished, attention, questionnaire scores, repeat
-                       consistency, display vs no display, comprehension, excluded and why
-    summary.csv        one row per property: BWS score + CI, A/B results, status
-    redundant.csv      property pairs judged alike (|r| >= redundancy_min_abs_r)
+    participants.csv   every participant: finished, attention, questionnaire scores, false
+                       alarms in the catch pairs, display vs no display, comprehension,
+                       excluded and why
+    summary.csv        one row per property: BWS score + CI, noticing, preference, H, score,
+                       status and probability of being selected
     subgroups.csv      noticing and preference per property by scene criticality, own vs
                        other country, and colour vision (colour-dependent properties)
     open_answers.csv   the open-question answers, for thematic coding
@@ -46,21 +47,25 @@ def write_report(result: dict, config: dict, path: Path) -> None:
     for prop, row in selected.iterrows():
         lines.append(f"- **{row['name']}** (`{prop}`): BWS {row['bws_score']:+.2f} "
                      f"[{row['bws_ci_low']:+.2f}, {row['bws_ci_high']:+.2f}], "
-                     f"noticed {row['noticed_share']:.0%}, majority preference {row['majority_share']:.0%}")
-    lines += ["", "## All properties", "",
-              "| Property | BWS score | Noticed | Majority pref. | Status |",
-              "| --- | --- | --- | --- | --- |"]
-    for prop, row in summary.iterrows():
-        def pct(v):
-            return "" if pd.isna(v) else f"{v:.0%}"
-        lines.append(f"| {row['name']} | {row['bws_score']:+.2f} | {pct(row['noticed_share'])} | "
-                     f"{pct(row['majority_share'])} | {row['status']} |")
+                     f"noticed {row['noticed_corrected']:.0%} (corrected), H {row['H']:.2f}, "
+                     f"selected in {row['p_selected']:.0%} of bootstrap samples")
+
+    def pct(v):
+        return "" if pd.isna(v) else f"{v:.0%}"
+
     def num(v, fmt):
         return "n/a" if pd.isna(v) else format(v, fmt)
 
-    lines += ["", "## Consistency and wanting a display", "",
-              f"- Repeated pairs answered with the same preferred level: {num(result['repeat_consistency'], '.0%')} "
-              "(low values mean part of the apparent disagreement is noise).",
+    lines += ["", "## All properties", "",
+              "| Property | Type | BWS score | Noticed (corrected) | H | Score | P(selected) | Status |",
+              "| --- | --- | --- | --- | --- | --- | --- | --- |"]
+    for prop, row in summary.iterrows():
+        lines.append(f"| {row['name']} | {row['type']} | {row['bws_score']:+.2f} | {pct(row['noticed_corrected'])} | "
+                     f"{num(row['H'], '.2f')} | {num(row['score'], '.2f')} | {pct(row['p_selected'])} | "
+                     f"{row['status']} |")
+    lines += ["", "## False alarms and wanting a display", "",
+              f"- Catch pairs (two identical clips) in which a difference was reported: "
+              f"{num(result['false_alarm_rate'], '.0%')}; subtracted from every property's noticing.",
               f"- Participants who preferred no display at all: {num(result['prefers_no_display'], '.0%')}.", ""]
     if "comprehension_n_low" in summary and (summary["comprehension_n_low"] + summary["comprehension_n_high"]).sum():
         lines += ["## Comprehension: what will the car do next?", "",
@@ -117,11 +122,11 @@ def write_report(result: dict, config: dict, path: Path) -> None:
             lines.append(f"| {summary.loc[row.property, 'name']} | {row.factor} | {seen} | "
                          f"{num(row.p_noticed_differs, '.3f')} | {high} | {num(row.p_prefer_high_differs, '.3f')} |")
     lines.append("")
-    lines += ["Rules (from the config): noticed by at least "
-              f"{config['noticed_min_share']:.0%}; in the top {config['matters_top_fraction']:.0%} by BWS "
-              "or a rating effect at p < .05; majority preference at most "
-              f"{config['disagreement_max_majority_share']:.0%}; not redundant at |r| >= "
-              f"{config['redundancy_min_abs_r']}; top {config['select_n']} by BWS score.", ""]
+    lines += [f"Rule (from the config): continuous or ordinal; noticed by at least {config['noticed_min_share']:.0%} "
+              f"after subtracting the false-alarm rate; then the top {config['select_n']} by importance (BWS score "
+              "on 0..1) x heterogeneity H. P(selected) is the share of "
+              f"{config.get('selection_bootstrap', 0)} bootstrap samples of participants in which the property is "
+              "selected.", ""]
     path.write_text("\n".join(lines), encoding="utf-8")
 
 
@@ -151,15 +156,14 @@ def main() -> None:
     out.mkdir(parents=True, exist_ok=True)
     result["participants"].to_csv(out / "participants.csv", index=False)
     result["summary"].to_csv(out / "summary.csv", index_label="property")
-    result["redundant"].to_csv(out / "redundant.csv", index=False)
     result["subgroups"].to_csv(out / "subgroups.csv", index=False)
     result["open_answers"].to_csv(out / "open_answers.csv", index=False)
     write_report(result, config, out / "report.md")
 
     print(f"{result['n_kept']} of {result['n_records']} participants kept; "
-          f"repeat consistency {result['repeat_consistency']:.0%}, "
+          f"false alarms {result['false_alarm_rate']:.0%}, "
           f"prefer no display {result['prefers_no_display']:.0%}")
-    print(result["summary"][["name", "bws_score", "noticed_share", "majority_share", "status"]]
+    print(result["summary"][["name", "bws_score", "noticed_corrected", "H", "score", "p_selected", "status"]]
           .to_string(float_format=lambda v: f"{v:.2f}"))
     print(f"\nWrote {out}")
 

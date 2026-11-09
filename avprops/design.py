@@ -130,6 +130,14 @@ def comprehension_plan(scenes: list[dict[str, Any]], allowed: dict[str, list[str
     return plan
 
 
+def ab_counts(config: dict[str, Any], properties: list[dict[str, Any]]) -> tuple[int, int]:
+    """Tunable and categorical properties each participant compares (capped at how many exist)."""
+    from avprops.common import TUNABLE
+    tunable = sum(p.get("type") in TUNABLE for p in properties)
+    return (min(int(config["ab_tunable_per_participant"]), tunable),
+            min(int(config["ab_categorical_per_participant"]), len(properties) - tunable))
+
+
 def build_design(config: dict[str, Any], properties: list[dict[str, Any]],
                  scenes: list[dict[str, Any]], checked: dict | None = None,
                  questionnaires: list[dict[str, Any]] | None = None,
@@ -149,14 +157,17 @@ def build_design(config: dict[str, Any], properties: list[dict[str, Any]],
         blocks = bws_version(len(ids), k, config["bws_appearances_per_item"], rng)
         versions.append([[ids[i] for i in block] for block in blocks])
 
-    pairs = config["ab_pairs_per_participant"]
     allowed = limit_scenes(ab_scenes(properties, scenes, checked), scenes, checked,
                            config.get("ab_max_scenes_per_property", 0))
+    few = [p for p, s in allowed.items() if len(s) < int(config["ab_scenes_per_property"])]
+    if few:
+        raise ValueError(f"each property is compared in {config['ab_scenes_per_property']} scenes, but these pass the "
+                         f"check in fewer: {', '.join(few)}")
     return {
         "study_id": config["study_id"],
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "properties": [
-            {key: p[key] for key in ("id", "element", "name", "description", "low", "high")}
+            {key: p[key] for key in ("id", "type", "element", "name", "description", "low", "high")}
             | ({"variants": list(p["render"]["variants"])} if "variants" in p.get("render", {}) else {})
             | ({"preview": f"previews/{p['id']}.mp4"} if p["id"] in (previews or ()) else {})
             for p in properties
@@ -166,11 +177,18 @@ def build_design(config: dict[str, Any], properties: list[dict[str, Any]],
         "baseline_scene": config["baseline_scene"],
         "bws": {"items_per_trial": k, "versions": versions},
         "ab": {
-            "pairs_per_participant": len(ids) if pairs in (0, None) else min(pairs, len(ids)),
+            # each participant compares some tunable properties, each in scenes_per_property
+            # different scenes (the agreement between a participant's answers gives the
+            # heterogeneity H), some categorical ones in one scene (they are settled by the
+            # majority, so need no H), and catch pairs of two identical clips (false alarms on
+            # "did you notice a difference")
+            "tunable_per_participant": ab_counts(config, properties)[0],
+            "categorical_per_participant": ab_counts(config, properties)[1],
+            "scenes_per_property": int(config["ab_scenes_per_property"]),
+            "catch_pairs": int(config.get("ab_catch_pairs", 0)),
             "collect_ratings": bool(config["ab_collect_ratings"]),
             "scale_points": int(config["rating_scale_points"]),
             "scenes": allowed,
-            "repeats": int(config.get("ab_repeats", 0)),
             "no_display": bool(config.get("ab_no_display", False)),
         },
         "comprehension": (comprehension_plan(scenes, allowed, config["baseline_scene"])

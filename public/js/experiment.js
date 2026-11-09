@@ -6,7 +6,7 @@
 // Timeline: preload -> full screen -> device check -> welcome and consent -> demographics
 // -> questionnaires -> comprehension clips ("what will the car do next?") -> baseline video
 // + open question (Task C) -> Best-Worst Scaling (Task A, MaxDiff) -> A/B video pairs
-// (Task B), with one display vs no display pair and repeated pairs at the end -> final
+// (Task B: each property in two scenes, catch pairs and one display vs no display pair) -> final
 // comment -> finish page with the worker code.
 //
 // URL parameters:
@@ -185,33 +185,54 @@ function buildTimeline(design) {
     // --- per-participant assignment
     var bws_version = Math.floor(Math.random() * design.bws.versions.length);
     var bws_trials = design.bws.versions[bws_version];
-    // each property's pair uses one of the scenes where its clips visibly differ
-    // (design.ab.scenes, from render_stimuli.py --check)
-    var scene_offset = Math.floor(Math.random() * design.scenes.length);
-    var ab_plan = jsPsych.randomization.shuffle(Object.keys(props))
-        .slice(0, design.ab.pairs_per_participant)
-        .map(function(prop, i) {
-            var allowed = design.ab.scenes[prop];
-            var a_level = Math.random() < 0.5 ? 'low' : 'high';
-            return { property: prop, scene: allowed[(i + scene_offset) % allowed.length],
-                     a_level: a_level, b_level: a_level === 'low' ? 'high' : 'low',
-                     high_variant: pickVariant(prop) };
+    // each participant compares design.ab.tunable_per_participant tunable properties, each in
+    // design.ab.scenes_per_property different scenes, and design.ab.categorical_per_participant
+    // categorical ones in one scene, always in scenes where the clips visibly differ
+    // (design.ab.scenes, from render_stimuli.py --check). How well a participant's answers in
+    // the two scenes agree tells stable preferences from indifference (the heterogeneity H);
+    // categorical properties are settled by the majority, so one answer each is enough.
+    var flip = function() { return Math.random() < 0.5; };
+    var ofType = function(tunable) {
+        return Object.keys(props).filter(function(id) { return (props[id].type !== 'categorical') === tunable; });
+    };
+    var compared = jsPsych.randomization.shuffle(ofType(true)).slice(0, design.ab.tunable_per_participant)
+        .map(function(prop) { return [prop, design.ab.scenes_per_property]; })
+        .concat(jsPsych.randomization.shuffle(ofType(false)).slice(0, design.ab.categorical_per_participant)
+            .map(function(prop) { return [prop, 1]; }));
+    var ab_plan = [];
+    compared.forEach(function(entry) {
+            var prop = entry[0];
+            var variant = pickVariant(prop);  // the same palette in both scenes: one comparison
+            jsPsych.randomization.shuffle(design.ab.scenes[prop])
+                .slice(0, entry[1])
+                .forEach(function(scene) {
+                    var a_level = flip() ? 'low' : 'high';
+                    ab_plan.push({ property: prop, scene: scene, a_level: a_level,
+                                   b_level: a_level === 'low' ? 'high' : 'low', high_variant: variant });
+                });
         });
-    // display vs no display: one extra pair, at a random place among the others
-    if (design.ab.no_display) {
-        var nd_a = Math.random() < 0.5 ? 'none' : 'baseline';
-        ab_plan.splice(Math.floor(Math.random() * (ab_plan.length + 1)), 0, {
-            property: 'no_display', scene: design.scenes[Math.floor(Math.random() * design.scenes.length)].id,
-            a_level: nd_a, b_level: nd_a === 'none' ? 'baseline' : 'none' });
+    // catch pairs: the same clip on both sides; "noticed a difference" here is a false alarm
+    for (var c = 0; c < design.ab.catch_pairs; c++) {
+        var catch_prop = Object.keys(props)[Math.floor(Math.random() * Object.keys(props).length)];
+        var catch_scenes = design.ab.scenes[catch_prop];
+        var catch_level = flip() ? 'low' : 'high';
+        ab_plan.push({ property: catch_prop, scene: catch_scenes[Math.floor(Math.random() * catch_scenes.length)],
+                       a_level: catch_level, b_level: catch_level, high_variant: pickVariant(catch_prop), catch: true });
     }
-    // repeated pairs: some pairs again at the end, sides swapped, to measure consistency
-    var repeat_plan = jsPsych.randomization.shuffle(ab_plan.filter(function(p) { return p.property !== 'no_display'; }))
-        .slice(0, design.ab.repeats)
-        .map(function(p) {
-            return { property: p.property, scene: p.scene, a_level: p.b_level, b_level: p.a_level,
-                     high_variant: p.high_variant, repeat: true };
-        });
-    var pair_plan = ab_plan.concat(repeat_plan);
+    // display vs no display: one extra pair
+    if (design.ab.no_display) {
+        var nd_a = flip() ? 'none' : 'baseline';
+        ab_plan.push({ property: 'no_display', scene: design.scenes[Math.floor(Math.random() * design.scenes.length)].id,
+                       a_level: nd_a, b_level: nd_a === 'none' ? 'baseline' : 'none' });
+    }
+    // random order in which a property's two pairs are not shown one after the other
+    var adjacent = function(plan) {
+        return plan.some(function(p, i) { return i > 0 && !p.catch && !plan[i - 1].catch && p.property === plan[i - 1].property; });
+    };
+    var pair_plan = jsPsych.randomization.shuffle(ab_plan);
+    for (var tries = 0; tries < 100 && adjacent(pair_plan); tries++) {
+        pair_plan = jsPsych.randomization.shuffle(ab_plan);
+    }
 
     // stimulus_url (config): stimuli/ when the server has the clips, or the URL where they are hosted
     var clip = function(scene, name) { return design.stimulus_url + scene + '/' + name + '.mp4'; };
@@ -233,7 +254,7 @@ function buildTimeline(design) {
 
     // --- preload, full screen, device check
     var videos = [baseline_clip];
-    ab_plan.forEach(function(p) { videos.push(pairClip(p, p.a_level), pairClip(p, p.b_level)); });
+    pair_plan.forEach(function(p) { videos.push(pairClip(p, p.a_level), pairClip(p, p.b_level)); });
     comprehension_plan.forEach(function(c) { videos.push(clip(c.scene, levelFile(c.property, c.level, c.high_variant))); });
     design.properties.forEach(function(p) { if (p.preview) videos.push(design.stimulus_url + p.preview); });
     timeline.push({
@@ -425,7 +446,9 @@ function buildTimeline(design) {
             '<div><h3>Video B</h3>' + videoTag(pairClip(plan, plan.b_level)) + '</div></div>' +
             '<div class="questions">' +
             '<p class="q">Did you notice a difference between the displays in A and B?</p>' + choiceHtml('noticed', [['yes', 'Yes'], ['no', 'No']]) +
-            '<p class="q">Which would you prefer to have while riding in a car that drives itself?</p>' + choiceHtml('preferred', [['A', 'Video A'], ['B', 'Video B']]) +
+            '<p class="q">Which display would you prefer to have while riding in a car that drives itself?</p>' +
+            choiceHtml('preferred', [['-2', 'A, clearly'], ['-1', 'A, slightly'], ['0', 'No preference'],
+                                     ['1', 'B, slightly'], ['2', 'B, clearly']]) +
             '<p class="q">How much does the difference between A and B matter to you?</p>' + scaleHtml('importance', points, 'Not at all', 'Very much');
         if (design.ab.collect_ratings) {
             var items = [['understanding', 'I understood what the car was doing and why.'],
@@ -443,13 +466,18 @@ function buildTimeline(design) {
             html: html,
             button_label: 'Continue',
             data: { task: 'ab', index: i, property: plan.property, scene: plan.scene, a_level: plan.a_level,
-                    b_level: plan.b_level, high_variant: plan.high_variant, repeat: !!plan.repeat },
+                    b_level: plan.b_level, high_variant: plan.high_variant, catch: !!plan.catch },
             on_load: flagMissingVideos,
             on_finish: function(data) {
                 var r = data.response;
                 data.noticed = r.noticed === 'yes';
-                data.preferred_option = r.preferred;
-                data.preferred_level = r.preferred === 'A' ? plan.a_level : plan.b_level;
+                // -2 (A, clearly) .. 2 (B, clearly); preference: the same towards the high level
+                // (towards the display, for the no-display pair), 0 = no preference
+                var towards_b = Number(r.preferred);
+                data.preferred_option = towards_b < 0 ? 'A' : (towards_b > 0 ? 'B' : 'none');
+                data.preferred_level = towards_b < 0 ? plan.a_level : (towards_b > 0 ? plan.b_level : 'none');
+                var b_up = plan.property === 'no_display' ? plan.b_level === 'baseline' : plan.b_level === 'high';
+                data.preference = plan.catch ? null : (b_up ? towards_b : -towards_b);
                 data.importance = Number(r.importance);
                 if (design.ab.collect_ratings) {
                     var ratings = {};

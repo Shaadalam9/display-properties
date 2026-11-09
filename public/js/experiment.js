@@ -71,32 +71,42 @@ jsPsych.randomization.setSeed(worker_code);
 var last_saved_index = -1;  // trial_index of the last row sent to the server
 
 /**
- * Save data. Sends only rows not sent before. Optional callback runs once the data is stored.
+ * Save data. Sends only rows not sent before. The optional callback runs once the data is
+ * stored, or after the last failed attempt, so the study never waits forever on a save.
  */
-function saveData(on_saved) {
+function saveData(on_done) {
+    var done = on_done || function() {};
     if (!save_data) {
-        if (on_saved) on_saved();
+        done();
         return;
     }
     var new_rows = jsPsych.data.get().filterCustom(function(row) { return row.trial_index > last_saved_index; });
     if (new_rows.count() === 0) {
-        if (on_saved) on_saved();
+        done();
         return;
     }
+    var first_index = new_rows.values()[0].trial_index;
+    // the next save sends only newer rows, unless this one fails (see below)
     last_saved_index = new_rows.last(1).values()[0].trial_index;
     var body = new_rows.json();
     var send = function(attempt) {
-        fetch('experiment-data', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body })
+        // keepalive lets the request finish when the page is left meanwhile; browsers allow it
+        // only for small bodies (64 kB)
+        fetch('experiment-data', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body,
+                                   keepalive: new Blob([body]).size < 60000 })
             .then(function(response) {
                 if (!response.ok) throw new Error('HTTP ' + response.status);
                 if (debug) console.log('data saved', new_rows.count(), 'rows');
-                if (on_saved) on_saved();
+                done();
             })
             .catch(function(err) {
                 if (attempt < 3) {
                     setTimeout(function() { send(attempt + 1); }, 2000 * attempt);
                 } else {
+                    // send these rows again with the next save (the analysis keeps one copy of a row)
+                    last_saved_index = Math.min(last_saved_index, first_index - 1);
                     alert('A problem occurred while saving your answers. Please contact the researcher.');
+                    done();
                 }
             });
     };
@@ -499,7 +509,13 @@ function buildTimeline(design) {
         questions: [{ prompt: STUDY_TEXT.finalComment, name: 'comment', rows: 5, columns: 80, required: false }],
         data: { task: 'final' }
     });
-    timeline.push(save_data_block);
+    // wait until the last rows are stored: the finish page follows right after, and leaving
+    // the page cancels a request still on its way (the last row marks the study as finished)
+    timeline.push({
+        type: jsPsychCallFunction,
+        async: true,
+        func: function(finish) { saveData(function() { finish(); }); }
+    });
     timeline.push({ type: jsPsychFullscreen, fullscreen_mode: false });
 
     if (debug) {

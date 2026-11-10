@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Not for this study: its data management plan (DMP-3509) requires the TU/e server (deploy/README.md).
+# Kept for studies that may use Heroku.
+#
 # Deploy the study to Heroku, as in bazilinskyy/ehmi-vehicles, but with the video clips:
 # the committed code (HEAD) plus only the clips the design needs and the ranking previews,
 # pushed straight to the Heroku app's own git. The clips never go to GitHub (third-party

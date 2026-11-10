@@ -30,8 +30,8 @@ var STUDY_TEXT = {
         'residence, driving experience, colour vision (you may choose "prefer not to say") and the type of browser ' +
         'and screen. We do not ask for your name, email address or exact location. Your IP address is stored ' +
         'with your answers only to detect people who take part more than once; it is then replaced by a ' +
-        'placeholder and never published. During the study the data are stored in a secured online database; ' +
-        'afterwards they are moved to TU/e storage and deleted from the database. An anonymised version of the data ' +
+        'placeholder and never published. The data are stored on servers of Eindhoven University of Technology; ' +
+        'no other organisation receives your answers. An anonymised version of the data ' +
         '(without codes or IP addresses, with age in ranges) will be published in an open research repository ' +
         'and used in scientific publications.</p>' +
         '<p><strong>Voluntary.</strong> Taking part is voluntary. You can stop at any time by closing this page, ' +

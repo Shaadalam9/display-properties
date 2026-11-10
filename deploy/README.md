@@ -1,8 +1,7 @@
-# Running the study on a server of our own
+# Running the study on a TU/e server
 
-The default deployment is Heroku with MongoDB, as in ehmi-vehicles (`deploy/heroku.sh`, see the main README).
-This is the alternative: one virtual server (e.g. TU/e datacenter or SURF Research Cloud) that also stores the
-responses itself.
+This is the deployment the study's approved data management plan (DMP-3509) requires. `heroku.sh` (Heroku with
+MongoDB) is kept for other studies but must not be used for this one.
 
 The study runs on one TU/e-managed virtual server (TU/e datacenter or SURF Research Cloud), so
 that no participant data passes through an outside hosting, database or video service:
@@ -15,11 +14,11 @@ that no participant data passes through an outside hosting, database or video se
 ## What the server needs
 
 * Linux with Node.js 22 and nginx
-* about 5 GB of disk for the code and the video stimuli (`public/stimuli/`, ~3 GB), plus the
+* about 3 GB of disk for the code and the video stimuli (`public/stimuli/`, ~1 GB), plus the
   responses (a few MB)
 * a public HTTPS address that participants anywhere can reach, with a certificate
-* outgoing bandwidth: each participant loads about 100 MB of video, so 400 participants are
-  about 40 GB over the weeks of data collection
+* outgoing bandwidth: each participant loads about 35 MB of video, so 800 participants are
+  about 30 GB over the weeks of data collection
 * a folder on TU/e storage that is backed up, for `DATA_FILE`
 
 ## Setup

@@ -309,20 +309,12 @@ URL parameters:
   when present; otherwise a random 14-character code is made.
 * `platform=<name>`: recruitment platform, stored with the data (e.g. `platform=microworkers`).
 
-**Hosting.** As in ehmi-vehicles, the live study runs on Heroku (`Procfile`, Node.js 22) with the responses in
-MongoDB (the `CONNECTION` config variable). The clips are not in git (third-party footage), so instead of deploying
-from GitHub, `deploy/heroku.sh` pushes the committed code together with only the clips the design needs (about
-250 MB, under Heroku's 500 MB limit) straight to the Heroku app:
-
-```bash
-heroku login
-heroku create <app> && heroku buildpacks:set heroku/nodejs -a <app>
-heroku config:set CONNECTION='<MongoDB connection string>' -a <app>
-deploy/heroku.sh <app>                                   # DRY_RUN=1 to only build and report the size
-```
-
-On Heroku the participant's IP address comes from the router. [`deploy/README.md`](deploy/README.md) describes the
-alternative of a server of our own (systemd and nginx, responses written to a file, no database).
+**Hosting.** The live study runs on a TU/e-managed virtual server, as the approved data management plan (DMP-3509)
+requires: no participant data goes to an outside hosting, database or video service. `app.js` serves the experiment
+and the clips, writes the responses to `DATA_FILE` on TU/e storage, and nginx in front keeps no access log, so IP
+addresses are stored only with the responses. [`deploy/README.md`](deploy/README.md) has the setup (systemd unit,
+nginx configuration, steps). `deploy/heroku.sh` (Heroku with MongoDB, as in ehmi-vehicles) is kept for other
+studies, but is not allowed for this one under its DMP.
 
 **Recruitment on Microworkers.** Give the campaign the link `https://<server>/?platform=microworkers` and ask for the
 completion code as proof. The link carries no worker ID: every participant gets a random code, which the finish page

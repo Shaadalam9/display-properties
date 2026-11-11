@@ -1,5 +1,5 @@
 {
- "_comment": "Driving situations used as stimuli. clip: source dashcam video (not in git). start_s/duration_s: the part of it used. event_s: when the car reacts, in source-clip seconds; the display is shown around it. why/how/manoeuvre: the explanation texts. geometry: overlay geometry for the clip, from the perception pipeline (data/geometry_pipeline/, which also holds the camera calibration it found); empty = data/geometry/<id>_geometry.jsonl.gz, written by extract_geometry.py. camera: flat-ground constants at 1280x720, given only where the pipeline's auto-calibration found none; they then win over the geometry's (check them with render_stimuli.py --calibrate). comprehension: the clip stops at stop_s (source-clip seconds) and the participant answers what the car does next; correct must match what the footage shows after stop_s. verified: whether a person checked the answer against the footage. country: ISO 3166 code of where the clip was filmed (compared with participants' country of residence). criticality: low or high, how risky the situation is; the analysis compares preferences between the two. source: the dataset video and its start in it. texts_verified: whether a person checked the why/how/manoeuvre texts against the footage (the how part is a guess from still frames until then).",
+ "_comment": "Driving situations used as stimuli. clip: source dashcam video (not in git). start_s/duration_s: the part of it used. event_s: when the car reacts, in source-clip seconds; the display is shown around it. why/how/manoeuvre: the explanation texts. geometry: overlay geometry for the clip, from the perception pipeline (data/geometry_pipeline/, which also holds the camera calibration it found); empty = data/geometry/<id>_geometry.jsonl.gz, written by extract_geometry.py. camera: flat-ground constants at 1280x720, given only where the pipeline's auto-calibration found none; they then win over the geometry's (check them with render_stimuli.py --calibrate). comprehension: the clip stops at stop_s (source-clip seconds) and the participant answers what the car does next; correct must match what the footage shows after stop_s. verified: whether a person checked the answer against the footage. country: ISO 3166 code of where the clip was filmed (compared with participants' country of residence). criticality: low or high, how risky the situation is; the analysis compares preferences between the two. source: the dataset video and its start in it. event_checked: whether a person checked event_s against the footage (propose_events.py proposes it). texts_verified: whether a person checked the why/how/manoeuvre texts against the footage (the how part is a guess from still frames until then).",
  "scenes": [
   {
    "id": "pedestrian_crossing",
@@ -116,8 +116,8 @@
    "start_s": 4.0,
    "duration_s": 14.0,
    "event_s": [
-    10.0,
-    15.0
+    8.5,
+    13.5
    ],
    "why": "Clear road ahead",
    "how": "Keeping lane",
@@ -130,7 +130,8 @@
     "video": "m9M4MYI_tAY",
     "start_s": 978.0,
     "city": "Rotterdam"
-   }
+   },
+   "event_checked": false
   },
   {
    "id": "rotterdam_risky",
@@ -139,8 +140,8 @@
    "start_s": 4.0,
    "duration_s": 14.0,
    "event_s": [
-    10.0,
-    15.0
+    13.0,
+    18.0
    ],
    "why": "Truck ahead at a crossing",
    "how": "Keeping distance",
@@ -153,7 +154,8 @@
     "video": "m9M4MYI_tAY",
     "start_s": 2543.0,
     "city": "Rotterdam"
-   }
+   },
+   "event_checked": false
   },
   {
    "id": "valencia_calm",
@@ -162,8 +164,8 @@
    "start_s": 4.0,
    "duration_s": 14.0,
    "event_s": [
-    10.0,
-    15.0
+    8.5,
+    13.5
    ],
    "why": "Clear road ahead",
    "how": "Keeping lane",
@@ -176,7 +178,8 @@
     "video": "G7wQRZ3nopk",
     "start_s": 2414.0,
     "city": "Valencia"
-   }
+   },
+   "event_checked": false
   },
   {
    "id": "valencia_risky",
@@ -185,8 +188,8 @@
    "start_s": 4.0,
    "duration_s": 14.0,
    "event_s": [
-    10.0,
-    15.0
+    9.7,
+    14.7
    ],
    "why": "Pedestrians crossing",
    "how": "Waiting",
@@ -199,7 +202,8 @@
     "video": "G7wQRZ3nopk",
     "start_s": 2655.0,
     "city": "Valencia"
-   }
+   },
+   "event_checked": false
   },
   {
    "id": "chicago_calm",
@@ -208,8 +212,8 @@
    "start_s": 4.0,
    "duration_s": 14.0,
    "event_s": [
-    10.0,
-    15.0
+    8.2,
+    13.2
    ],
    "why": "Red light",
    "how": "Waiting",
@@ -228,7 +232,8 @@
     "video": "XzwI2rGmf04",
     "start_s": 712.0,
     "city": "Chicago"
-   }
+   },
+   "event_checked": false
   },
   {
    "id": "chicago_risky",
@@ -237,8 +242,8 @@
    "start_s": 4.0,
    "duration_s": 14.0,
    "event_s": [
-    10.0,
-    15.0
+    7.5,
+    12.5
    ],
    "why": "Pedestrian crossing",
    "how": "Waiting",
@@ -251,7 +256,8 @@
     "video": "XzwI2rGmf04",
     "start_s": 3555.0,
     "city": "Chicago"
-   }
+   },
+   "event_checked": false
   },
   {
    "id": "mexico_city_calm",
@@ -260,8 +266,8 @@
    "start_s": 4.0,
    "duration_s": 14.0,
    "event_s": [
-    10.0,
-    15.0
+    8.5,
+    13.5
    ],
    "why": "Clear road ahead",
    "how": "Keeping lane",
@@ -274,7 +280,8 @@
     "video": "MpA3FHZ3yZc",
     "start_s": 2370.0,
     "city": "Mexico City"
-   }
+   },
+   "event_checked": false
   },
   {
    "id": "mexico_city_risky",
@@ -283,8 +290,8 @@
    "start_s": 4.0,
    "duration_s": 14.0,
    "event_s": [
-    10.0,
-    15.0
+    9.6,
+    14.6
    ],
    "why": "Pedestrian crossing",
    "how": "Waiting",
@@ -303,7 +310,8 @@
     "video": "MpA3FHZ3yZc",
     "start_s": 160.0,
     "city": "Mexico City"
-   }
+   },
+   "event_checked": false
   },
   {
    "id": "jaipur_calm",
@@ -312,8 +320,8 @@
    "start_s": 4.0,
    "duration_s": 14.0,
    "event_s": [
-    10.0,
-    15.0
+    8.5,
+    13.5
    ],
    "why": "Clear road ahead",
    "how": "Keeping lane",
@@ -326,7 +334,8 @@
     "video": "jwZV8i60Sbs",
     "start_s": 850.0,
     "city": "Jaipur"
-   }
+   },
+   "event_checked": false
   },
   {
    "id": "jaipur_risky",
@@ -335,8 +344,8 @@
    "start_s": 4.0,
    "duration_s": 14.0,
    "event_s": [
-    10.0,
-    15.0
+    12.0,
+    17.0
    ],
    "why": "Rickshaws and pedestrians close",
    "how": "Driving slowly",
@@ -349,7 +358,8 @@
     "video": "jwZV8i60Sbs",
     "start_s": 90.5,
     "city": "Jaipur"
-   }
+   },
+   "event_checked": false
   },
   {
    "id": "hanoi_calm",
@@ -358,8 +368,8 @@
    "start_s": 4.0,
    "duration_s": 14.0,
    "event_s": [
-    10.0,
-    15.0
+    8.5,
+    13.5
    ],
    "why": "Light traffic ahead",
    "how": "Keeping lane",
@@ -372,7 +382,8 @@
     "video": "AKaJkDqrOjU",
     "start_s": 364.0,
     "city": "Hanoi"
-   }
+   },
+   "event_checked": false
   },
   {
    "id": "hanoi_risky",
@@ -381,8 +392,8 @@
    "start_s": 4.0,
    "duration_s": 14.0,
    "event_s": [
-    10.0,
-    15.0
+    8.5,
+    13.5
    ],
    "why": "Motorbikes all around",
    "how": "Driving slowly",
@@ -395,7 +406,8 @@
     "video": "AKaJkDqrOjU",
     "start_s": 493.0,
     "city": "Hanoi"
-   }
+   },
+   "event_checked": false
   },
   {
    "id": "kobe_calm",
@@ -404,8 +416,8 @@
    "start_s": 4.0,
    "duration_s": 14.0,
    "event_s": [
-    10.0,
-    15.0
+    8.5,
+    13.5
    ],
    "why": "Clear road ahead",
    "how": "Keeping lane",
@@ -418,7 +430,8 @@
     "video": "TJjqYeYyIoE",
     "start_s": 632.0,
     "city": "Kobe"
-   }
+   },
+   "event_checked": false
   },
   {
    "id": "kobe_risky",
@@ -427,8 +440,8 @@
    "start_s": 4.0,
    "duration_s": 14.0,
    "event_s": [
-    10.0,
-    15.0
+    9.2,
+    14.2
    ],
    "why": "Pedestrians on the street",
    "how": "Driving slowly",
@@ -441,7 +454,8 @@
     "video": "TJjqYeYyIoE",
     "start_s": 1452.0,
     "city": "Kobe"
-   }
+   },
+   "event_checked": false
   },
   {
    "id": "sydney_calm",
@@ -450,8 +464,8 @@
    "start_s": 4.0,
    "duration_s": 14.0,
    "event_s": [
-    10.0,
-    15.0
+    8.5,
+    13.5
    ],
    "why": "Clear road ahead",
    "how": "Keeping lane",
@@ -464,7 +478,8 @@
     "video": "wMu6Va5PhGY",
     "start_s": 242.0,
     "city": "Sydney"
-   }
+   },
+   "event_checked": false
   },
   {
    "id": "sydney_risky",
@@ -473,8 +488,8 @@
    "start_s": 4.0,
    "duration_s": 14.0,
    "event_s": [
-    10.0,
-    15.0
+    13.0,
+    18.0
    ],
    "why": "Traffic crossing ahead",
    "how": "Waiting",
@@ -493,7 +508,8 @@
     "video": "wMu6Va5PhGY",
     "start_s": 1902.5,
     "city": "Sydney"
-   }
+   },
+   "event_checked": false
   }
  ]
 }

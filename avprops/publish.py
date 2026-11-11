@@ -32,17 +32,23 @@ def age_band(age: Any) -> str:
     return next((f"{lo}-{hi}" if hi < 99 else f"{lo}+" for lo, hi in AGE_BANDS if lo <= years <= hi), "")
 
 
-def anonymise(records: list[dict], seed: int | None = None) -> dict[str, pd.DataFrame]:
+def anonymise(records: list[dict], seed: int | None = None,
+              exclusions: pd.DataFrame | None = None) -> dict[str, pd.DataFrame]:
     """Tables of the published dataset. ``seed`` only for tests: the real export draws the
     new IDs from fresh randomness, so they cannot be reproduced from the codes."""
     order = np.random.default_rng(seed).permutation(len(records))
     new_id = {records[i]["pid"]: f"P{k + 1:04d}" for k, i in enumerate(order)}
+    reasons = ({} if exclusions is None else exclusions.set_index("pid")["reasons"].to_dict())
 
     participants, bws, ab, comprehension, open_answers = [], [], [], [], []
     for rec in records:
         pid = new_id[rec["pid"]]
         demo = rec.get("demographics") or {}
+        excluded = reasons.get(rec["pid"])
         participants.append({"participant": pid, "finished": rec.get("finished"),
+                             # whether and why the analysis left them out, so N can be reproduced
+                             "excluded": None if excluded is None else bool(excluded),
+                             "exclusion_reasons": excluded or "",
                              "attention_wrong": (rec.get("attention") or {}).get("wrong"),
                              "age_band": age_band(demo.get("age")),
                              **{k: demo.get(k) for k in DEMOGRAPHICS},

@@ -27,7 +27,7 @@ from pathlib import Path
 import pandas as pd
 
 from avprops.analysis import analyse
-from avprops.common import load_config, load_properties, load_questionnaires, load_scenes, load_secret, resolve
+from avprops.common import config_fingerprint, load_config, load_properties, load_questionnaires, load_scenes, load_secret, resolve
 from avprops.crowd import download, read_rows, rows_to_records
 
 
@@ -37,6 +37,8 @@ def write_report(result: dict, config: dict, path: Path) -> None:
         f"# Property selection: {config['study_id']}",
         "",
         f"Participants: {result['n_records']} records, {result['n_kept']} kept after exclusions.",
+        f"Settings: {config_fingerprint(config)}; design version(s): "
+        f"{', '.join(sorted(set(result['participants'].query('not excluded')['design'].dropna().astype(str)))) or 'none'}.",
         "",
         "## Selected",
         "",

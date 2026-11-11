@@ -21,9 +21,10 @@ body {
 .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
 
 /* BWS */
-.jspsych-maxdiff-table { max-width: 900px; }
+.jspsych-maxdiff-table { max-width: 1180px; }
 .alt { text-align: left; padding: 4px 8px; display: flex; gap: 14px; align-items: center; }
-.alt video.preview { width: 300px; border-radius: 4px; flex: none; background: #000; }
+/* previews large enough to see the difference: 360 px per level (review by Mark Colley) */
+.alt video.preview { width: 720px; border-radius: 4px; flex: none; background: #000; }
 .alt .levels { color: #5f6368; font-size: 14px; }
 
 /* A/B questions */

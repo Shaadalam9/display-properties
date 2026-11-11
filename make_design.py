@@ -31,7 +31,7 @@ def required_clips(design: dict) -> list[str]:
 def main() -> None:
     config = load_config()
     properties = load_properties(config)
-    check_path = PROJECT_ROOT / "data" / "stimulus_check.json"
+    check_path = PROJECT_ROOT / "study" / "stimulus_check.json"
     checked = json.loads(check_path.read_text()) if check_path.exists() else None
     scenes = [s for s in load_scenes(config) if s.get("clip")] if checked else load_scenes(config)
     preview_dir = resolve(config["design_output"]).parent / "stimuli" / "previews"
@@ -55,7 +55,7 @@ def main() -> None:
           f"({', '.join(c['scene'] for c in design['comprehension'])})")
     print(f"  Questionnaires: {', '.join(q['id'] for q in design['questionnaires']) or 'none'}")
     print(f"  Ranking previews: {sum('preview' in p for p in design['properties'])} of {len(design['properties'])}")
-    print("  " + ("Scenes per property from data/stimulus_check.json" if checked
+    print("  " + ("Scenes per property from study/stimulus_check.json" if checked
                   else "No stimulus check yet: every scene allowed for every property"))
     for prop, allowed in design["ab"]["scenes"].items():
         if checked and len(allowed) < len(scenes):

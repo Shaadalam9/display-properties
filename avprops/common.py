@@ -22,6 +22,15 @@ def load_config(root: Path = PROJECT_ROOT) -> dict[str, Any]:
         return json.load(fh)
 
 
+def config_fingerprint(config: dict[str, Any], root: Path = PROJECT_ROOT) -> str:
+    """Which settings a result came from: the file (a local ``config`` silently replaces
+    ``default.config``) and a short hash of its contents."""
+    import hashlib
+    source = "config" if (root / "config").exists() else "default.config"
+    digest = hashlib.sha256(json.dumps(config, sort_keys=True).encode()).hexdigest()[:12]
+    return f"{source} (sha256 {digest})"
+
+
 def load_secret(root: Path = PROJECT_ROOT) -> dict[str, Any]:
     """Return the secrets from ``secret``, or the empty template ``default.secret``."""
     local = root / "secret"

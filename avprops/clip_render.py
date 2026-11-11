@@ -43,20 +43,23 @@ def _hex(code: str) -> tuple[int, int, int]:
 # colours as RGB: "target" fills, outlines and marks road users, "trajectory" draws the
 # path, "highlight" is the accent (here: the second road-user class when class_colours is
 # on), "label_text"/"label_background" the text panels. "far" is where the path's
-# uncertainty gradient ends; the palettes define none, so it is a red-ish tone per palette.
+# uncertainty gradient ends (and the low end of the confidence bar); the palettes define none.
+# It is a neutral light grey, not red: red reads as danger rather than as "less certain"
+# (review by Mark Colley, 2026-11-09).
+FAR = _hex("#D0D0D0")
 PALETTES = {
     0: {"name": "automotive_standard", "target": _hex("#FFDC00"), "trajectory": _hex("#5AC8F5"),
         "highlight": _hex("#FFA000"), "label_text": _hex("#FFFFFF"), "label_background": _hex("#000000"),
-        "far": _hex("#FF4678")},
+        "far": FAR},
     1: {"name": "accessibility_okabe_ito", "target": _hex("#56B4E9"), "trajectory": _hex("#009E73"),
         "highlight": _hex("#E69F00"), "label_text": _hex("#111111"), "label_background": _hex("#F0E442"),
-        "far": _hex("#D55E00")},
+        "far": FAR},
     2: {"name": "minimalist_hud", "target": _hex("#E0E0E0"), "trajectory": _hex("#48CAE4"),
         "highlight": _hex("#90E0EF"), "label_text": _hex("#FFFFFF"), "label_background": _hex("#222222"),
-        "far": _hex("#FF6B6B")},
+        "far": FAR},
     3: {"name": "high_saliency", "target": _hex("#FF0055"), "trajectory": _hex("#CCFF00"),
         "highlight": _hex("#FF0055"), "label_text": _hex("#FFFFFF"), "label_background": _hex("#000000"),
-        "far": _hex("#FF0000")},
+        "far": FAR},
 }
 
 HIGHLIGHT_STYLES = ("outline", "fill", "box")
@@ -469,8 +472,9 @@ class ClipRenderer:
                     m = _mask(shape, lambda m: cv2.fillPoly(m, [pts], 255, cv2.LINE_AA))
                     opacity = style.mask_alpha
                 elif style.highlight_style == "outline":
+                    # the same opacity as a fill: outline vs fill compares the style, not the strength
                     m = _mask(shape, lambda m: cv2.polylines(m, [pts], True, 255, thick, cv2.LINE_AA))
-                    opacity = min(1.0, style.mask_alpha * 2)
+                    opacity = style.mask_alpha
                 else:
                     m = _mask(shape, lambda m: cv2.rectangle(m, (x0, y0), (x1, y1), 255, thick, cv2.LINE_AA))
                     opacity = min(1.0, style.mask_alpha * 2)

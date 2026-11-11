@@ -3,6 +3,7 @@
     uv run python render_stimuli.py --calibrate                 # check each scene's camera constants
     uv run python render_stimuli.py --preview                   # one still per clip, as a contact sheet
     uv run python render_stimuli.py --check                     # flag pairs that barely differ in a scene
+    uv run python render_stimuli.py --check --delivered         # the same, on the encoded clips participants see
     uv run python render_stimuli.py                             # all clips -> public/stimuli/
     uv run python render_stimuli.py --scene pedestrian_crossing --property path_width
     uv run python render_stimuli.py --reencode                  # shrink clips rendered at full size
@@ -67,6 +68,43 @@ def geometry_for(scene: dict):
 
 def frame_at(clip: Path, index: int, size) -> np.ndarray:
     return next(read_frames(clip, index, 1, size=size))
+
+
+def check_delivered(scene: dict, styles: list[tuple[str, Style]], step_s: float = 0.5,
+                    min_changed: float = 0.002) -> list[tuple[str, float, bool]]:
+    """Like check(), but on the delivered files in public/stimuli/<scene>/ (encoded, at the
+    size participants see), so compression and scaling count. A property with variants must
+    differ from its low clip in every variant."""
+    folder = PROJECT_ROOT / "public" / "stimuli" / scene["id"]
+    # two clips that differ anywhere are compressed differently everywhere: a light blur and a
+    # higher threshold than check() leave that noise out (on hanoi_risky they reproduce the
+    # fresh-render shares within 0.2 percentage points)
+
+    def sampled(name: str) -> list[np.ndarray]:
+        cap = cv2.VideoCapture(str(folder / f"{name}.mp4"))
+        step = max(1, int(round(step_s * (cap.get(cv2.CAP_PROP_FPS) or 30))))
+        frames, k = [], 0
+        while True:
+            ok, image = cap.read()
+            if not ok:
+                break
+            if k % step == 0:
+                frames.append(cv2.blur(image, (5, 5)).astype(np.int16))
+            k += 1
+        cap.release()
+        if not frames:
+            raise FileNotFoundError(folder / f"{name}.mp4")
+        return frames
+
+    results = []
+    for name in [n[:-4] for n, _ in styles if n.endswith("_low")]:
+        low = sampled(name + "_low")
+        highs = [n for n, _ in styles if n == name + "_high" or n.startswith(name + "_high_")]
+        shares = [float(np.mean([(np.abs(a - b).max(axis=2) > 25).mean() for a, b in zip(low, sampled(h))]))
+                  for h in highs]
+        share = min(shares)
+        results.append((name, share, share >= min_changed))
+    return results
 
 
 def calibrate(scene: dict, geometry, out: Path) -> None:
@@ -221,6 +259,8 @@ def main() -> None:
                         help="build the ranking screens' example videos from the rendered clips")
     parser.add_argument("--check", action="store_true",
                         help="report how much each pair differs in each scene, without rendering videos")
+    parser.add_argument("--delivered", action="store_true",
+                        help="with --check: compare the delivered (encoded) clips instead of fresh renders")
     parser.add_argument("--reencode", action="store_true",
                         help="re-encode rendered clips wider than the delivered size, without rendering again")
     args = parser.parse_args()
@@ -239,7 +279,8 @@ def main() -> None:
     if args.scene:
         scenes = [s for s in scenes if s["id"] in args.scene]
 
-    check_path = PROJECT_ROOT / "data" / "stimulus_check.json"
+    # in git: it decides which scenes each property may use, so the design can be reproduced
+    check_path = PROJECT_ROOT / "study" / "stimulus_check.json"
     checked = json.loads(check_path.read_text()) if check_path.exists() else {}
     if args.previews:
         build_previews(props, checked)
@@ -253,7 +294,7 @@ def main() -> None:
             continue
         if args.check:
             print(f"{scene['id']}: share of pixels that differ between low and high (mean over the clip)")
-            results = check(scene, geometry, styles)
+            results = check_delivered(scene, styles) if args.delivered else check(scene, geometry, styles)
             for name, share, ok in results:
                 print(f"  {'ok  ' if ok else 'WEAK'} {name:<22} {share:7.2%}")
             checked.setdefault(scene["id"], {}).update(  # a run for some properties keeps the others

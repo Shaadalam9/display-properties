@@ -1,0 +1,1332 @@
+{
+ "pedestrian_crossing": {
+  "trajectory_alpha": {
+   "changed": 0.01532,
+   "ok": true
+  },
+  "path_width": {
+   "changed": 0.01707,
+   "ok": true
+  },
+  "path_length": {
+   "changed": 0.00176,
+   "ok": false
+  },
+  "path_style": {
+   "changed": 0.00255,
+   "ok": true
+  },
+  "path_uncertainty": {
+   "changed": 0.00323,
+   "ok": true
+  },
+  "manoeuvre_cue": {
+   "changed": 0.00665,
+   "ok": true
+  },
+  "mask_alpha": {
+   "changed": 0.00745,
+   "ok": true
+  },
+  "highlight_scope": {
+   "changed": 0.01443,
+   "ok": true
+  },
+  "highlight_style": {
+   "changed": 0.00546,
+   "ok": true
+  },
+  "class_colours": {
+   "changed": 6e-05,
+   "ok": false
+  },
+  "marker_size": {
+   "changed": 0.00166,
+   "ok": false
+  },
+  "predicted_paths": {
+   "changed": 0.00575,
+   "ok": true
+  },
+  "explanation_detail": {
+   "changed": 0.01436,
+   "ok": true
+  },
+  "show_when": {
+   "changed": 0.00401,
+   "ok": true
+  },
+  "confidence_indicator": {
+   "changed": 0.00359,
+   "ok": true
+  },
+  "background_dim_alpha": {
+   "changed": 0.46227,
+   "ok": true
+  },
+  "palette_id": {
+   "changed": 0.00118,
+   "ok": false
+  }
+ },
+ "braking_in_traffic": {
+  "trajectory_alpha": {
+   "changed": 0.02381,
+   "ok": true
+  },
+  "path_width": {
+   "changed": 0.02492,
+   "ok": true
+  },
+  "path_length": {
+   "changed": 0.00034,
+   "ok": false
+  },
+  "path_style": {
+   "changed": 0.003,
+   "ok": true
+  },
+  "path_uncertainty": {
+   "changed": 0.00195,
+   "ok": false
+  },
+  "manoeuvre_cue": {
+   "changed": 0.00734,
+   "ok": true
+  },
+  "mask_alpha": {
+   "changed": 0.00128,
+   "ok": false
+  },
+  "highlight_scope": {
+   "changed": 0.09384,
+   "ok": true
+  },
+  "highlight_style": {
+   "changed": 0.00069,
+   "ok": false
+  },
+  "class_colours": {
+   "changed": 0.00702,
+   "ok": true
+  },
+  "marker_size": {
+   "changed": 0.00102,
+   "ok": false
+  },
+  "predicted_paths": {
+   "changed": 0.00333,
+   "ok": true
+  },
+  "explanation_detail": {
+   "changed": 0.02402,
+   "ok": true
+  },
+  "show_when": {
+   "changed": 0.0018,
+   "ok": false
+  },
+  "confidence_indicator": {
+   "changed": 0.00544,
+   "ok": true
+  },
+  "background_dim_alpha": {
+   "changed": 0.79908,
+   "ok": true
+  },
+  "palette_id": {
+   "changed": 0.00078,
+   "ok": false
+  }
+ },
+ "unexpected_obstacle": {
+  "trajectory_alpha": {
+   "changed": 0.02136,
+   "ok": true
+  },
+  "path_width": {
+   "changed": 0.02104,
+   "ok": true
+  },
+  "path_length": {
+   "changed": 0.00148,
+   "ok": false
+  },
+  "path_style": {
+   "changed": 0.00303,
+   "ok": true
+  },
+  "path_uncertainty": {
+   "changed": 0.00329,
+   "ok": true
+  },
+  "manoeuvre_cue": {
+   "changed": 0.00546,
+   "ok": true
+  },
+  "mask_alpha": {
+   "changed": 0.00354,
+   "ok": true
+  },
+  "highlight_scope": {
+   "changed": 0.04844,
+   "ok": true
+  },
+  "highlight_style": {
+   "changed": 0.00253,
+   "ok": true
+  },
+  "class_colours": {
+   "changed": 0.00326,
+   "ok": true
+  },
+  "marker_size": {
+   "changed": 0.00097,
+   "ok": false
+  },
+  "predicted_paths": {
+   "changed": 0.00287,
+   "ok": true
+  },
+  "explanation_detail": {
+   "changed": 0.02178,
+   "ok": true
+  },
+  "show_when": {
+   "changed": 0.00622,
+   "ok": true
+  },
+  "confidence_indicator": {
+   "changed": 0.00422,
+   "ok": true
+  },
+  "background_dim_alpha": {
+   "changed": 0.63186,
+   "ok": true
+  },
+  "palette_id": {
+   "changed": 0.00077,
+   "ok": false
+  }
+ },
+ "rotterdam_calm": {
+  "trajectory_alpha": {
+   "changed": 0.02414,
+   "ok": true
+  },
+  "path_width": {
+   "changed": 0.02226,
+   "ok": true
+  },
+  "path_length": {
+   "changed": 0.00338,
+   "ok": true
+  },
+  "path_style": {
+   "changed": 0.00372,
+   "ok": true
+  },
+  "path_uncertainty": {
+   "changed": 0.01929,
+   "ok": true
+  },
+  "manoeuvre_cue": {
+   "changed": 0.00426,
+   "ok": true
+  },
+  "mask_alpha": {
+   "changed": 0.0,
+   "ok": false
+  },
+  "highlight_scope": {
+   "changed": 0.00093,
+   "ok": false
+  },
+  "highlight_style": {
+   "changed": 0.0,
+   "ok": false
+  },
+  "class_colours": {
+   "changed": 1e-05,
+   "ok": false
+  },
+  "marker_size": {
+   "changed": 0.0,
+   "ok": false
+  },
+  "predicted_paths": {
+   "changed": 0.00038,
+   "ok": false
+  },
+  "explanation_detail": {
+   "changed": 0.01419,
+   "ok": true
+  },
+  "show_when": {
+   "changed": 0.01377,
+   "ok": true
+  },
+  "confidence_indicator": {
+   "changed": 0.00402,
+   "ok": true
+  },
+  "background_dim_alpha": {
+   "changed": 0.40084,
+   "ok": true
+  },
+  "palette_id": {
+   "changed": 1e-05,
+   "ok": false
+  }
+ },
+ "rotterdam_risky": {
+  "trajectory_alpha": {
+   "changed": 0.01119,
+   "ok": true
+  },
+  "path_width": {
+   "changed": 0.01373,
+   "ok": true
+  },
+  "path_length": {
+   "changed": 1e-05,
+   "ok": false
+  },
+  "path_style": {
+   "changed": 0.00118,
+   "ok": false
+  },
+  "path_uncertainty": {
+   "changed": 0.00024,
+   "ok": false
+  },
+  "manoeuvre_cue": {
+   "changed": 0.00422,
+   "ok": true
+  },
+  "mask_alpha": {
+   "changed": 9e-05,
+   "ok": false
+  },
+  "highlight_scope": {
+   "changed": 0.10386,
+   "ok": true
+  },
+  "highlight_style": {
+   "changed": 6e-05,
+   "ok": false
+  },
+  "class_colours": {
+   "changed": 2e-05,
+   "ok": false
+  },
+  "marker_size": {
+   "changed": 4e-05,
+   "ok": false
+  },
+  "predicted_paths": {
+   "changed": 0.00151,
+   "ok": false
+  },
+  "explanation_detail": {
+   "changed": 0.01727,
+   "ok": true
+  },
+  "show_when": {
+   "changed": 0.01211,
+   "ok": true
+  },
+  "confidence_indicator": {
+   "changed": 0.003,
+   "ok": true
+  },
+  "background_dim_alpha": {
+   "changed": 0.39302,
+   "ok": true
+  },
+  "palette_id": {
+   "changed": 2e-05,
+   "ok": false
+  }
+ },
+ "valencia_calm": {
+  "trajectory_alpha": {
+   "changed": 0.01697,
+   "ok": true
+  },
+  "path_width": {
+   "changed": 0.01659,
+   "ok": true
+  },
+  "path_length": {
+   "changed": 0.00073,
+   "ok": false
+  },
+  "path_style": {
+   "changed": 0.00165,
+   "ok": false
+  },
+  "path_uncertainty": {
+   "changed": 0.00381,
+   "ok": true
+  },
+  "manoeuvre_cue": {
+   "changed": 0.00509,
+   "ok": true
+  },
+  "mask_alpha": {
+   "changed": 0.00018,
+   "ok": false
+  },
+  "highlight_scope": {
+   "changed": 0.00034,
+   "ok": false
+  },
+  "highlight_style": {
+   "changed": 0.00021,
+   "ok": false
+  },
+  "class_colours": {
+   "changed": 0.0001,
+   "ok": false
+  },
+  "marker_size": {
+   "changed": 0.00013,
+   "ok": false
+  },
+  "predicted_paths": {
+   "changed": 0.00016,
+   "ok": false
+  },
+  "explanation_detail": {
+   "changed": 0.01537,
+   "ok": true
+  },
+  "show_when": {
+   "changed": 0.0126,
+   "ok": true
+  },
+  "confidence_indicator": {
+   "changed": 0.0039,
+   "ok": true
+  },
+  "background_dim_alpha": {
+   "changed": 0.48523,
+   "ok": true
+  },
+  "palette_id": {
+   "changed": 0.00014,
+   "ok": false
+  }
+ },
+ "valencia_risky": {
+  "trajectory_alpha": {
+   "changed": 0.01842,
+   "ok": true
+  },
+  "path_width": {
+   "changed": 0.01631,
+   "ok": true
+  },
+  "path_length": {
+   "changed": 0.00113,
+   "ok": false
+  },
+  "path_style": {
+   "changed": 0.00186,
+   "ok": false
+  },
+  "path_uncertainty": {
+   "changed": 0.00394,
+   "ok": true
+  },
+  "manoeuvre_cue": {
+   "changed": 0.00532,
+   "ok": true
+  },
+  "mask_alpha": {
+   "changed": 0.0159,
+   "ok": true
+  },
+  "highlight_scope": {
+   "changed": 0.0175,
+   "ok": true
+  },
+  "highlight_style": {
+   "changed": 0.01381,
+   "ok": true
+  },
+  "class_colours": {
+   "changed": 4e-05,
+   "ok": false
+  },
+  "marker_size": {
+   "changed": 0.00468,
+   "ok": true
+  },
+  "predicted_paths": {
+   "changed": 0.00202,
+   "ok": true
+  },
+  "explanation_detail": {
+   "changed": 0.01327,
+   "ok": true
+  },
+  "show_when": {
+   "changed": 0.00988,
+   "ok": true
+  },
+  "confidence_indicator": {
+   "changed": 0.00367,
+   "ok": true
+  },
+  "background_dim_alpha": {
+   "changed": 0.43955,
+   "ok": true
+  },
+  "palette_id": {
+   "changed": 0.00372,
+   "ok": true
+  }
+ },
+ "chicago_calm": {
+  "trajectory_alpha": {
+   "changed": 0.01073,
+   "ok": true
+  },
+  "path_width": {
+   "changed": 0.01276,
+   "ok": true
+  },
+  "path_length": {
+   "changed": 0.00226,
+   "ok": true
+  },
+  "path_style": {
+   "changed": 0.00208,
+   "ok": true
+  },
+  "path_uncertainty": {
+   "changed": 0.0017,
+   "ok": false
+  },
+  "manoeuvre_cue": {
+   "changed": 0.00461,
+   "ok": true
+  },
+  "mask_alpha": {
+   "changed": 0.00103,
+   "ok": false
+  },
+  "highlight_scope": {
+   "changed": 0.0022,
+   "ok": true
+  },
+  "highlight_style": {
+   "changed": 0.00074,
+   "ok": false
+  },
+  "class_colours": {
+   "changed": 0.00078,
+   "ok": false
+  },
+  "marker_size": {
+   "changed": 0.00055,
+   "ok": false
+  },
+  "predicted_paths": {
+   "changed": 0.00027,
+   "ok": false
+  },
+  "explanation_detail": {
+   "changed": 0.00851,
+   "ok": true
+  },
+  "show_when": {
+   "changed": 0.00729,
+   "ok": true
+  },
+  "confidence_indicator": {
+   "changed": 0.00299,
+   "ok": true
+  },
+  "background_dim_alpha": {
+   "changed": 0.25679,
+   "ok": true
+  },
+  "palette_id": {
+   "changed": 0.00038,
+   "ok": false
+  }
+ },
+ "chicago_risky": {
+  "trajectory_alpha": {
+   "changed": 0.0076,
+   "ok": true
+  },
+  "path_width": {
+   "changed": 0.00734,
+   "ok": true
+  },
+  "path_length": {
+   "changed": 0.00097,
+   "ok": false
+  },
+  "path_style": {
+   "changed": 0.00125,
+   "ok": false
+  },
+  "path_uncertainty": {
+   "changed": 0.00301,
+   "ok": true
+  },
+  "manoeuvre_cue": {
+   "changed": 0.00475,
+   "ok": true
+  },
+  "mask_alpha": {
+   "changed": 0.00565,
+   "ok": true
+  },
+  "highlight_scope": {
+   "changed": 0.00658,
+   "ok": true
+  },
+  "highlight_style": {
+   "changed": 0.00478,
+   "ok": true
+  },
+  "class_colours": {
+   "changed": 1e-05,
+   "ok": false
+  },
+  "marker_size": {
+   "changed": 0.00108,
+   "ok": false
+  },
+  "predicted_paths": {
+   "changed": 0.0026,
+   "ok": true
+  },
+  "explanation_detail": {
+   "changed": 0.01275,
+   "ok": true
+  },
+  "show_when": {
+   "changed": 0.00252,
+   "ok": true
+  },
+  "confidence_indicator": {
+   "changed": 0.00346,
+   "ok": true
+  },
+  "background_dim_alpha": {
+   "changed": 0.34686,
+   "ok": true
+  },
+  "palette_id": {
+   "changed": 0.00076,
+   "ok": false
+  }
+ },
+ "mexico_city_calm": {
+  "trajectory_alpha": {
+   "changed": 0.0152,
+   "ok": true
+  },
+  "path_width": {
+   "changed": 0.01722,
+   "ok": true
+  },
+  "path_length": {
+   "changed": 0.00135,
+   "ok": false
+  },
+  "path_style": {
+   "changed": 0.00213,
+   "ok": true
+  },
+  "path_uncertainty": {
+   "changed": 0.00267,
+   "ok": true
+  },
+  "manoeuvre_cue": {
+   "changed": 0.00465,
+   "ok": true
+  },
+  "mask_alpha": {
+   "changed": 0.0,
+   "ok": false
+  },
+  "highlight_scope": {
+   "changed": 0.00112,
+   "ok": false
+  },
+  "highlight_style": {
+   "changed": 0.0,
+   "ok": false
+  },
+  "class_colours": {
+   "changed": 5e-05,
+   "ok": false
+  },
+  "marker_size": {
+   "changed": 0.0,
+   "ok": false
+  },
+  "predicted_paths": {
+   "changed": 0.00066,
+   "ok": false
+  },
+  "explanation_detail": {
+   "changed": 0.01391,
+   "ok": true
+  },
+  "show_when": {
+   "changed": 0.01043,
+   "ok": true
+  },
+  "confidence_indicator": {
+   "changed": 0.0037,
+   "ok": true
+  },
+  "background_dim_alpha": {
+   "changed": 0.45364,
+   "ok": true
+  },
+  "palette_id": {
+   "changed": 4e-05,
+   "ok": false
+  }
+ },
+ "mexico_city_risky": {
+  "trajectory_alpha": {
+   "changed": 0.01041,
+   "ok": true
+  },
+  "path_width": {
+   "changed": 0.01127,
+   "ok": true
+  },
+  "path_length": {
+   "changed": 0.00119,
+   "ok": false
+  },
+  "path_style": {
+   "changed": 0.00106,
+   "ok": false
+  },
+  "path_uncertainty": {
+   "changed": 0.00765,
+   "ok": true
+  },
+  "manoeuvre_cue": {
+   "changed": 0.00703,
+   "ok": true
+  },
+  "mask_alpha": {
+   "changed": 0.00774,
+   "ok": true
+  },
+  "highlight_scope": {
+   "changed": 0.10385,
+   "ok": true
+  },
+  "highlight_style": {
+   "changed": 0.00681,
+   "ok": true
+  },
+  "class_colours": {
+   "changed": 2e-05,
+   "ok": false
+  },
+  "marker_size": {
+   "changed": 0.00154,
+   "ok": false
+  },
+  "predicted_paths": {
+   "changed": 0.00076,
+   "ok": false
+  },
+  "explanation_detail": {
+   "changed": 0.01369,
+   "ok": true
+  },
+  "show_when": {
+   "changed": 0.00685,
+   "ok": true
+  },
+  "confidence_indicator": {
+   "changed": 0.00321,
+   "ok": true
+  },
+  "background_dim_alpha": {
+   "changed": 0.42007,
+   "ok": true
+  },
+  "palette_id": {
+   "changed": 0.00113,
+   "ok": false
+  }
+ },
+ "jaipur_calm": {
+  "trajectory_alpha": {
+   "changed": 0.02265,
+   "ok": true
+  },
+  "path_width": {
+   "changed": 0.02557,
+   "ok": true
+  },
+  "path_length": {
+   "changed": 0.00173,
+   "ok": false
+  },
+  "path_style": {
+   "changed": 0.00255,
+   "ok": true
+  },
+  "path_uncertainty": {
+   "changed": 0.00327,
+   "ok": true
+  },
+  "manoeuvre_cue": {
+   "changed": 0.00509,
+   "ok": true
+  },
+  "mask_alpha": {
+   "changed": 0.0012,
+   "ok": false
+  },
+  "highlight_scope": {
+   "changed": 0.00113,
+   "ok": false
+  },
+  "highlight_style": {
+   "changed": 0.001,
+   "ok": false
+  },
+  "class_colours": {
+   "changed": 2e-05,
+   "ok": false
+  },
+  "marker_size": {
+   "changed": 0.00014,
+   "ok": false
+  },
+  "predicted_paths": {
+   "changed": 0.00026,
+   "ok": false
+  },
+  "explanation_detail": {
+   "changed": 0.01532,
+   "ok": true
+  },
+  "show_when": {
+   "changed": 0.01221,
+   "ok": true
+  },
+  "confidence_indicator": {
+   "changed": 0.00365,
+   "ok": true
+  },
+  "background_dim_alpha": {
+   "changed": 0.52847,
+   "ok": true
+  },
+  "palette_id": {
+   "changed": 0.00012,
+   "ok": false
+  }
+ },
+ "jaipur_risky": {
+  "trajectory_alpha": {
+   "changed": 0.01446,
+   "ok": true
+  },
+  "path_width": {
+   "changed": 0.01636,
+   "ok": true
+  },
+  "path_length": {
+   "changed": 0.00215,
+   "ok": true
+  },
+  "path_style": {
+   "changed": 0.00207,
+   "ok": true
+  },
+  "path_uncertainty": {
+   "changed": 0.01127,
+   "ok": true
+  },
+  "manoeuvre_cue": {
+   "changed": 0.00483,
+   "ok": true
+  },
+  "mask_alpha": {
+   "changed": 0.02333,
+   "ok": true
+  },
+  "highlight_scope": {
+   "changed": 0.05061,
+   "ok": true
+  },
+  "highlight_style": {
+   "changed": 0.01948,
+   "ok": true
+  },
+  "class_colours": {
+   "changed": 0.00046,
+   "ok": false
+  },
+  "marker_size": {
+   "changed": 0.00684,
+   "ok": true
+  },
+  "predicted_paths": {
+   "changed": 0.00345,
+   "ok": true
+  },
+  "explanation_detail": {
+   "changed": 0.02219,
+   "ok": true
+  },
+  "show_when": {
+   "changed": 0.00945,
+   "ok": true
+  },
+  "confidence_indicator": {
+   "changed": 0.00385,
+   "ok": true
+  },
+  "background_dim_alpha": {
+   "changed": 0.41943,
+   "ok": true
+  },
+  "palette_id": {
+   "changed": 0.00507,
+   "ok": true
+  }
+ },
+ "hanoi_calm": {
+  "trajectory_alpha": {
+   "changed": 0.01323,
+   "ok": true
+  },
+  "path_width": {
+   "changed": 0.00581,
+   "ok": true
+  },
+  "path_length": {
+   "changed": 0.00027,
+   "ok": false
+  },
+  "path_style": {
+   "changed": 0.00181,
+   "ok": false
+  },
+  "path_uncertainty": {
+   "changed": 0.00143,
+   "ok": false
+  },
+  "manoeuvre_cue": {
+   "changed": 0.00416,
+   "ok": true
+  },
+  "mask_alpha": {
+   "changed": 0.00467,
+   "ok": true
+  },
+  "highlight_scope": {
+   "changed": 0.05104,
+   "ok": true
+  },
+  "highlight_style": {
+   "changed": 0.00335,
+   "ok": true
+  },
+  "class_colours": {
+   "changed": 0.00023,
+   "ok": false
+  },
+  "marker_size": {
+   "changed": 0.00163,
+   "ok": false
+  },
+  "predicted_paths": {
+   "changed": 0.00126,
+   "ok": false
+  },
+  "explanation_detail": {
+   "changed": 0.01367,
+   "ok": true
+  },
+  "show_when": {
+   "changed": 0.00501,
+   "ok": true
+  },
+  "confidence_indicator": {
+   "changed": 0.00366,
+   "ok": true
+  },
+  "background_dim_alpha": {
+   "changed": 0.40869,
+   "ok": true
+  },
+  "palette_id": {
+   "changed": 0.00124,
+   "ok": false
+  }
+ },
+ "hanoi_risky": {
+  "trajectory_alpha": {
+   "changed": 0.0,
+   "ok": false
+  },
+  "path_width": {
+   "changed": 2e-05,
+   "ok": false
+  },
+  "path_length": {
+   "changed": 0.0,
+   "ok": false
+  },
+  "path_style": {
+   "changed": 0.0,
+   "ok": false
+  },
+  "path_uncertainty": {
+   "changed": 0.0,
+   "ok": false
+  },
+  "manoeuvre_cue": {
+   "changed": 0.00231,
+   "ok": true
+  },
+  "mask_alpha": {
+   "changed": 0.03244,
+   "ok": true
+  },
+  "highlight_scope": {
+   "changed": 0.02398,
+   "ok": true
+  },
+  "highlight_style": {
+   "changed": 0.02691,
+   "ok": true
+  },
+  "class_colours": {
+   "changed": 0.00252,
+   "ok": true
+  },
+  "marker_size": {
+   "changed": 0.00511,
+   "ok": true
+  },
+  "predicted_paths": {
+   "changed": 0.0005,
+   "ok": false
+  },
+  "explanation_detail": {
+   "changed": 0.01567,
+   "ok": true
+  },
+  "show_when": {
+   "changed": 0.00387,
+   "ok": true
+  },
+  "confidence_indicator": {
+   "changed": 0.00337,
+   "ok": true
+  },
+  "background_dim_alpha": {
+   "changed": 0.34295,
+   "ok": true
+  },
+  "palette_id": {
+   "changed": 0.00374,
+   "ok": true
+  }
+ },
+ "kobe_calm": {
+  "trajectory_alpha": {
+   "changed": 0.01967,
+   "ok": true
+  },
+  "path_width": {
+   "changed": 0.01595,
+   "ok": true
+  },
+  "path_length": {
+   "changed": 0.00153,
+   "ok": false
+  },
+  "path_style": {
+   "changed": 0.00224,
+   "ok": true
+  },
+  "path_uncertainty": {
+   "changed": 0.00406,
+   "ok": true
+  },
+  "manoeuvre_cue": {
+   "changed": 0.00476,
+   "ok": true
+  },
+  "mask_alpha": {
+   "changed": 0.00027,
+   "ok": false
+  },
+  "highlight_scope": {
+   "changed": 0.00398,
+   "ok": true
+  },
+  "highlight_style": {
+   "changed": 0.00018,
+   "ok": false
+  },
+  "class_colours": {
+   "changed": 3e-05,
+   "ok": false
+  },
+  "marker_size": {
+   "changed": 0.00014,
+   "ok": false
+  },
+  "predicted_paths": {
+   "changed": 0.00041,
+   "ok": false
+  },
+  "explanation_detail": {
+   "changed": 0.01444,
+   "ok": true
+  },
+  "show_when": {
+   "changed": 0.01059,
+   "ok": true
+  },
+  "confidence_indicator": {
+   "changed": 0.00313,
+   "ok": true
+  },
+  "background_dim_alpha": {
+   "changed": 0.44158,
+   "ok": true
+  },
+  "palette_id": {
+   "changed": 0.00013,
+   "ok": false
+  }
+ },
+ "kobe_risky": {
+  "trajectory_alpha": {
+   "changed": 0.02,
+   "ok": true
+  },
+  "path_width": {
+   "changed": 0.02547,
+   "ok": true
+  },
+  "path_length": {
+   "changed": 0.00066,
+   "ok": false
+  },
+  "path_style": {
+   "changed": 0.00182,
+   "ok": false
+  },
+  "path_uncertainty": {
+   "changed": 0.00245,
+   "ok": true
+  },
+  "manoeuvre_cue": {
+   "changed": 0.00435,
+   "ok": true
+  },
+  "mask_alpha": {
+   "changed": 0.03857,
+   "ok": true
+  },
+  "highlight_scope": {
+   "changed": 0.05738,
+   "ok": true
+  },
+  "highlight_style": {
+   "changed": 0.03438,
+   "ok": true
+  },
+  "class_colours": {
+   "changed": 0.00465,
+   "ok": true
+  },
+  "marker_size": {
+   "changed": 0.00814,
+   "ok": true
+  },
+  "predicted_paths": {
+   "changed": 0.00109,
+   "ok": false
+  },
+  "explanation_detail": {
+   "changed": 0.01765,
+   "ok": true
+  },
+  "show_when": {
+   "changed": 0.02211,
+   "ok": true
+  },
+  "confidence_indicator": {
+   "changed": 0.00405,
+   "ok": true
+  },
+  "background_dim_alpha": {
+   "changed": 0.38185,
+   "ok": true
+  },
+  "palette_id": {
+   "changed": 0.00612,
+   "ok": true
+  }
+ },
+ "sydney_calm": {
+  "trajectory_alpha": {
+   "changed": 0.01486,
+   "ok": true
+  },
+  "path_width": {
+   "changed": 0.01611,
+   "ok": true
+  },
+  "path_length": {
+   "changed": 0.00163,
+   "ok": false
+  },
+  "path_style": {
+   "changed": 0.00265,
+   "ok": true
+  },
+  "path_uncertainty": {
+   "changed": 0.00262,
+   "ok": true
+  },
+  "manoeuvre_cue": {
+   "changed": 0.00381,
+   "ok": true
+  },
+  "mask_alpha": {
+   "changed": 0.0,
+   "ok": false
+  },
+  "highlight_scope": {
+   "changed": 0.00191,
+   "ok": false
+  },
+  "highlight_style": {
+   "changed": 0.0,
+   "ok": false
+  },
+  "class_colours": {
+   "changed": 2e-05,
+   "ok": false
+  },
+  "marker_size": {
+   "changed": 0.0,
+   "ok": false
+  },
+  "predicted_paths": {
+   "changed": 0.00069,
+   "ok": false
+  },
+  "explanation_detail": {
+   "changed": 0.01505,
+   "ok": true
+  },
+  "show_when": {
+   "changed": 0.00925,
+   "ok": true
+  },
+  "confidence_indicator": {
+   "changed": 0.0038,
+   "ok": true
+  },
+  "background_dim_alpha": {
+   "changed": 0.36311,
+   "ok": true
+  },
+  "palette_id": {
+   "changed": 2e-05,
+   "ok": false
+  }
+ },
+ "sydney_risky": {
+  "trajectory_alpha": {
+   "changed": 0.0098,
+   "ok": true
+  },
+  "path_width": {
+   "changed": 0.01194,
+   "ok": true
+  },
+  "path_length": {
+   "changed": 0.00085,
+   "ok": false
+  },
+  "path_style": {
+   "changed": 0.00179,
+   "ok": false
+  },
+  "path_uncertainty": {
+   "changed": 0.0012,
+   "ok": false
+  },
+  "manoeuvre_cue": {
+   "changed": 0.00493,
+   "ok": true
+  },
+  "mask_alpha": {
+   "changed": 0.00739,
+   "ok": true
+  },
+  "highlight_scope": {
+   "changed": 0.06047,
+   "ok": true
+  },
+  "highlight_style": {
+   "changed": 0.00564,
+   "ok": true
+  },
+  "class_colours": {
+   "changed": 9e-05,
+   "ok": false
+  },
+  "marker_size": {
+   "changed": 0.00457,
+   "ok": true
+  },
+  "predicted_paths": {
+   "changed": 0.00265,
+   "ok": true
+  },
+  "explanation_detail": {
+   "changed": 0.01196,
+   "ok": true
+  },
+  "show_when": {
+   "changed": 0.00723,
+   "ok": true
+  },
+  "confidence_indicator": {
+   "changed": 0.00318,
+   "ok": true
+  },
+  "background_dim_alpha": {
+   "changed": 0.25868,
+   "ok": true
+  },
+  "palette_id": {
+   "changed": 0.00341,
+   "ok": true
+  }
+ }
+}

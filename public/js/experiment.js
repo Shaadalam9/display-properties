@@ -467,7 +467,15 @@ function buildTimeline(design) {
             button_label: 'Continue',
             data: { task: 'ab', index: i, property: plan.property, scene: plan.scene, a_level: plan.a_level,
                     b_level: plan.b_level, high_variant: plan.high_variant, catch: !!plan.catch },
-            on_load: flagMissingVideos,
+            on_load: function() {
+                flagMissingVideos();
+                // Continue only once the clips have played through once (not in debug mode)
+                var button = document.querySelector('#jspsych-survey-html-form-next');
+                if (!debug && button && design.ab.min_view_s > 0) {
+                    button.disabled = true;
+                    setTimeout(function() { button.disabled = false; }, design.ab.min_view_s * 1000);
+                }
+            },
             on_finish: function(data) {
                 var r = data.response;
                 data.noticed = r.noticed === 'yes';

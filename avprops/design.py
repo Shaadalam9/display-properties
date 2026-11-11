@@ -114,15 +114,17 @@ def limit_scenes(allowed: dict[str, list[str]], scenes: list[dict[str, Any]],
 
 
 def comprehension_plan(scenes: list[dict[str, Any]], allowed: dict[str, list[str]],
-                       baseline_scene: str) -> list[dict[str, Any]]:
+                       baseline_scene: str, excluded: set[str] | None = None) -> list[dict[str, Any]]:
     """One comprehension question per scene that has one, never the baseline scene (its
-    whole clip has been seen by then). Lists the properties whose pair works in it."""
+    whole clip has been seen by then). Lists the properties whose pair works in it, except
+    ``excluded``: those whose high level names the car's action in words and so would give
+    the answer away before the clip stops."""
     plan = []
     for scene in scenes:
         spec = scene.get("comprehension")
         if not spec or scene["id"] == baseline_scene:
             continue
-        properties = [p for p, ok in allowed.items() if scene["id"] in ok]
+        properties = [p for p, ok in allowed.items() if scene["id"] in ok and p not in (excluded or set())]
         if properties:
             plan.append({"scene": scene["id"], "stop_s": round(spec["stop_s"] - scene["start_s"], 2),
                          "question": spec["question"], "options": spec["options"], "correct": spec["correct"],
@@ -190,8 +192,11 @@ def build_design(config: dict[str, Any], properties: list[dict[str, Any]],
             "scale_points": int(config["rating_scale_points"]),
             "scenes": allowed,
             "no_display": bool(config.get("ab_no_display", False)),
+            # seconds before Continue works: the clips have to be watched once
+            "min_view_s": float(config.get("ab_min_view_s", 0)),
         },
-        "comprehension": (comprehension_plan(scenes, allowed, config["baseline_scene"])
+        "comprehension": (comprehension_plan(scenes, allowed, config["baseline_scene"],
+                                             {p["id"] for p in properties if p.get("in_comprehension") is False})
                           if config.get("comprehension") else []),
         "questionnaires": [
             {key: q[key] for key in ("id", "name", "preamble", "labels")}

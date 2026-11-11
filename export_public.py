@@ -11,7 +11,8 @@ from __future__ import annotations
 
 import argparse
 
-from avprops.common import load_config, resolve
+from avprops.analysis import apply_exclusions
+from avprops.common import load_config, load_properties, resolve
 from avprops.crowd import read_rows, rows_to_records
 from avprops.publish import anonymise
 
@@ -27,7 +28,8 @@ def main() -> None:
     records = rows_to_records(read_rows([resolve(f) for f in args.data]), config["attention_max_wrong"])
     if not args.include_debug:
         records = [r for r in records if not r.get("debug")]
-    tables = anonymise(records)
+    _, exclusions = apply_exclusions(records, config, load_properties(config))
+    tables = anonymise(records, exclusions=exclusions)
     out = resolve(args.out)
     out.mkdir(parents=True, exist_ok=True)
     for name, table in tables.items():

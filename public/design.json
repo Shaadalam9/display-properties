@@ -1,6 +1,6 @@
 {
  "study_id": "av_display_properties_v1",
- "generated_at": "2026-11-09T13:41:01+00:00",
+ "generated_at": "2026-11-10T13:55:08+00:00",
  "properties": [
   {
    "id": "trajectory_alpha",
@@ -49,7 +49,7 @@
    "name": "Path certainty colour",
    "description": "Whether the path changes colour further ahead, where the car is less certain.",
    "low": "One colour",
-   "high": "Colour changes with distance",
+   "high": "Fades to grey further ahead",
    "preview": "previews/path_uncertainty.mp4"
   },
   {
@@ -4309,40 +4309,39 @@
   "scale_points": 7,
   "scenes": {
    "trajectory_alpha": [
-    "braking_in_traffic",
-    "rotterdam_risky",
+    "unexpected_obstacle",
+    "rotterdam_calm",
     "jaipur_calm",
     "kobe_risky"
    ],
    "path_width": [
-    "braking_in_traffic",
-    "rotterdam_risky",
+    "unexpected_obstacle",
+    "rotterdam_calm",
     "jaipur_calm",
     "kobe_risky"
    ],
    "path_length": [
     "rotterdam_calm",
     "chicago_calm",
-    "mexico_city_risky",
     "jaipur_risky"
    ],
    "path_style": [
-    "braking_in_traffic",
+    "pedestrian_crossing",
     "unexpected_obstacle",
     "rotterdam_calm",
-    "rotterdam_risky"
+    "sydney_calm"
    ],
    "path_uncertainty": [
-    "unexpected_obstacle",
     "rotterdam_calm",
-    "mexico_city_calm",
-    "jaipur_risky"
+    "mexico_city_risky",
+    "jaipur_risky",
+    "kobe_calm"
    ],
    "manoeuvre_cue": [
     "pedestrian_crossing",
     "braking_in_traffic",
-    "mexico_city_risky",
-    "jaipur_calm"
+    "valencia_calm",
+    "mexico_city_risky"
    ],
    "mask_alpha": [
     "valencia_risky",
@@ -4364,9 +4363,9 @@
    ],
    "class_colours": [
     "braking_in_traffic",
-    "rotterdam_risky",
-    "mexico_city_risky",
-    "hanoi_calm"
+    "unexpected_obstacle",
+    "hanoi_risky",
+    "kobe_risky"
    ],
    "marker_size": [
     "valencia_risky",
@@ -4377,30 +4376,31 @@
    "predicted_paths": [
     "pedestrian_crossing",
     "braking_in_traffic",
-    "jaipur_risky"
-   ],
-   "explanation_detail": [
-    "unexpected_obstacle",
-    "mexico_city_calm",
     "jaipur_risky",
-    "sydney_calm"
-   ],
-   "show_when": [
-    "valencia_calm",
-    "jaipur_risky",
-    "kobe_calm",
     "sydney_risky"
    ],
+   "explanation_detail": [
+    "braking_in_traffic",
+    "valencia_calm",
+    "jaipur_risky",
+    "kobe_risky"
+   ],
+   "show_when": [
+    "rotterdam_calm",
+    "valencia_risky",
+    "jaipur_calm",
+    "kobe_risky"
+   ],
    "confidence_indicator": [
-    "pedestrian_crossing",
     "unexpected_obstacle",
     "rotterdam_calm",
-    "valencia_calm"
+    "valencia_calm",
+    "kobe_risky"
    ],
    "background_dim_alpha": [
+    "pedestrian_crossing",
     "unexpected_obstacle",
-    "rotterdam_calm",
-    "mexico_city_risky",
+    "valencia_calm",
     "jaipur_calm"
    ],
    "palette_id": [
@@ -4410,7 +4410,8 @@
     "kobe_risky"
    ]
   },
-  "no_display": true
+  "no_display": true,
+  "min_view_s": 14.0
  },
  "comprehension": [
   {
@@ -4424,10 +4425,6 @@
    ],
    "correct": "Keep following the traffic in its lane",
    "properties": [
-    "trajectory_alpha",
-    "path_width",
-    "path_style",
-    "manoeuvre_cue",
     "highlight_scope",
     "class_colours",
     "predicted_paths"
@@ -4444,9 +4441,10 @@
    ],
    "correct": "Keep driving slowly in its lane",
    "properties": [
+    "trajectory_alpha",
+    "path_width",
     "path_style",
-    "path_uncertainty",
-    "explanation_detail",
+    "class_colours",
     "confidence_indicator",
     "background_dim_alpha"
    ]

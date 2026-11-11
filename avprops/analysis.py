@@ -495,7 +495,7 @@ def analyse(records: list[dict], properties: list[dict], config: dict,
     mask_ips(records)  # the addresses are not needed after the exclusions; no output holds them
     individual = bws_individual(kept, prop_ids)
     summary = bws_summary(individual, config["bootstrap_samples"], config["bootstrap_seed"])
-    skip_cvd = ({p["id"] for p in properties if p.get("colour_dependent")}
+    skip_cvd = ({p["id"] for p in properties if p.get("colour_dependent") and not p.get("keep_colour_vision_deficiency")}
                 if config.get("colour_properties_without_cvd") else set())
     summary = summary.join(ab_summary(kept, prop_ids, skip_cvd))
     summary = summary.join(comprehension_summary(kept, prop_ids))
@@ -505,7 +505,8 @@ def analyse(records: list[dict], properties: list[dict], config: dict,
     tunable = {p["id"] for p in properties if p.get("type") in TUNABLE}
     summary["p_selected"] = selection_probability(kept, individual, prop_ids, tunable, skip_cvd, config)
     participants = pd.DataFrame([{
-        "pid": r["pid"], "ip": r.get("ip"), "finished": r.get("finished"), "debug": r.get("debug"),
+        "pid": r["pid"], "ip": r.get("ip"), "design": r.get("design_generated_at"),
+        "finished": r.get("finished"), "debug": r.get("debug"),
         "attention_wrong": (r.get("attention") or {}).get("wrong"),
         "bws_trials": len(r.get("bws", [])), "ab_pairs": len(property_pairs(r)),
         "catch_noticed": catch_noticed(r)[0], "catch_pairs": catch_noticed(r)[1],

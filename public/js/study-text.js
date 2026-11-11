@@ -77,6 +77,8 @@ var STUDY_TEXT = {
 // ends when attention_fail_at answers are wrong (setting in the config / design.json).
 var ATTENTION_QUESTIONS = [
     { question: 'What is 2+2?', options: ['22', '4', '12'], correct: '4' },
+    // about the videos themselves, not general knowledge
+    { question: 'Where were the videos in this study filmed?', options: ['From a car in traffic', 'From a boat at sea', 'From a train in a tunnel'], correct: 'From a car in traffic' },
     { question: 'What are you doing in this study?', options: ['Watching videos of traffic with a display', 'Listening to music', 'Drawing patterns on the screen'], correct: 'Watching videos of traffic with a display' },
     { question: 'Select the true statement.', options: ['Paris is the capital of Germany', 'Water is wet', 'The sun is purple'], correct: 'Water is wet' },
     { question: 'What do the videos in this study show?', options: ['Traffic seen from a car', 'Paintings', 'Supermarket products'], correct: 'Traffic seen from a car' },

@@ -59,7 +59,7 @@ videos instead.
 | **Path width**<br>`path_width` | How wide the planned path is drawn.<br><br>Low: Thin line<br>High: Car-wide band | <img src="docs/figures/properties/path_width.gif" width="420" alt="Path width: Thin line vs Car-wide band"> |
 | **Path length**<br>`path_length` | How far ahead the planned path is shown.<br><br>Low: Short (about 8 m)<br>High: Long (about 35 m) | <img src="docs/figures/properties/path_length.gif" width="420" alt="Path length: Short (about 8 m) vs Long (about 35 m)"> |
 | **Path style**<br>`path_style` | Whether the path is a plain band or carries arrows that flow forward.<br><br>Low: Plain band<br>High: Flowing arrows | <img src="docs/figures/properties/path_style.gif" width="420" alt="Path style: Plain band vs Flowing arrows"> |
-| **Path certainty colour**<br>`path_uncertainty` | Whether the path changes colour further ahead, where the car is less certain.<br><br>Low: One colour<br>High: Colour changes with distance | <img src="docs/figures/properties/path_uncertainty.gif" width="420" alt="Path certainty colour: One colour vs Colour changes with distance"> |
+| **Path certainty colour**<br>`path_uncertainty` | Whether the path changes colour further ahead, where the car is less certain.<br><br>Low: One colour<br>High: Fades to grey further ahead | <img src="docs/figures/properties/path_uncertainty.gif" width="420" alt="Path certainty colour: One colour vs Fades to grey further ahead"> |
 
 **Planned manoeuvre**
 
@@ -155,8 +155,11 @@ clips from elsewhere) and its criticality (to compare calm and risky situations)
 | `sydney_calm` | Sydney | Australia | calm | [wMu6Va5PhGY at 4:06](https://www.youtube.com/watch?v=wMu6Va5PhGY&t=246s) |
 | `sydney_risky` | Sydney | Australia | risky | [wMu6Va5PhGY at 31:46](https://www.youtube.com/watch?v=wMu6Va5PhGY&t=1906s) |
 
-`study/scenes.json` also holds each scene's explanation texts; `texts_verified` stays false until someone has checked
-them against the clip.
+`study/scenes.json` also holds each scene's explanation texts and event window (`event_s`: when the car reacts; the
+display appears around it). `texts_verified` and `event_checked` stay false until someone has checked them against the
+clip. `propose_events.py` proposes the event windows from the geometry (closest pedestrian ahead, strongest braking,
+or the middle of the clip for routine driving) and writes a sheet per scene with speed, pedestrian distance and frames
+(`data/review/events/`) to check them by eye.
 
 ## What participants do
 
@@ -178,18 +181,26 @@ flowchart TD
    affinity for technology interaction (ATI, Franke et al. 2019, 9 items), to test whether preferences split by user
    type.
 3. **Comprehension:** one clip per scene with a question, at a random level of one property. The clip stops before the
-   car acts and the participant answers "What will the car do next?", before any property is named.
+   car acts and the participant answers "What will the car do next?", before any property is named. Properties whose
+   high level names the action in words (explanation detail, manoeuvre cue) are left out here, as they would give the
+   answer away. With two scenes and about 10–20 answers per level, this measure is exploratory.
 4. **Open question (Task C):** a baseline clip, then "What would you want this display to show, or show differently?"
 5. **Ranking (Task A):** Best-Worst Scaling. Each trial shows 4 properties; the participant picks the most and least
    important for understanding what the car is doing and why. Each property comes with a looping preview of its two
-   levels side by side, so it is judged from what it looks like and not only from its name.
+   levels side by side (360 px per level), so it is judged from what it looks like and not only from its name.
 6. **A/B pairs (Task B):** the same situation with a property at its low and high level (sides randomised): did you
    notice a difference, which display would you prefer while riding (A clearly, A slightly, no preference, B slightly,
    B clearly), and how much does the difference matter (1–7). Each participant compares 6 of the 9 tunable properties,
    **each in two different scenes**, so that their two answers show whether they hold a stable preference or do not
    care; and 2 of the 8 categorical properties in one scene. Mixed in: **2 catch pairs** with the same clip on both
    sides (reporting a difference there is a false alarm) and the display vs the same clip without a display.
-7. Five attention checks between the trials; three wrong answers end the study, with a partial payment.
+   "Continue" works only once the clips have played through (`ab_min_view_s`, 14 s).
+7. Six attention checks between the trials, one about the videos themselves; three wrong answers end the study, with a
+   partial payment.
+
+The ranking always comes before the A/B pairs, so the ranking may shape how the pairs are judged; this is a limitation
+of the design. The analysis of user types (preference by trust and affinity for technology) is exploratory: at the
+planned sample size it can only find large effects.
 
 <table>
   <tr>
@@ -243,11 +254,11 @@ uv sync --extra extract                                  # detection and trackin
 uv run python extract_geometry.py --device mps           # fallback geometry (cuda:0 on a GPU host)
 uv run python render_stimuli.py --calibrate              # check each scene's camera constants
 uv run python render_stimuli.py --preview                # a still of every clip, as a contact sheet
-uv run python render_stimuli.py --check                  # how much each pair differs in each scene
-uv run python make_design.py                             # uses the check to pick scenes per property
+uv run python propose_events.py                          # event windows to check by eye (--apply writes them)
 uv run python render_stimuli.py                          # the clips, as H.264, into public/stimuli/
+uv run python render_stimuli.py --check --delivered      # how much each pair differs, on the delivered clips
 uv run python render_stimuli.py --previews               # the ranking previews, from the rendered clips
-uv run python make_design.py                             # again, so the design lists the previews
+uv run python make_design.py                             # uses the check to pick scenes per property
 uv run python make_figures.py                            # the figures in this README
 ```
 
@@ -277,8 +288,10 @@ that.
 
 **Which scenes a property uses.** A property can only differ in a scene that has what it acts on: other road users'
 paths need people moving sideways, colour by type needs vehicles, "when shown" needs an event with a few seconds
-before it. `--check` measures, per scene, the share of pixels that differ between the low and high clip and flags
-pairs below 0.2% as `WEAK`; `make_design.py` then lets each property's A/B pair use only the scenes where it passed,
+before it. `--check --delivered` measures, per scene, the share of pixels that differ between the low and high clip
+as participants get them (encoded, 960 px; lightly blurred so compression noise does not count) and flags pairs below
+0.2% as `WEAK` (`--check` alone does the same on fresh renders). The result is `study/stimulus_check.json`, in git,
+since it decides the design; `make_design.py` then lets each property's A/B pair use only the scenes where it passed,
 at most 4 per property (`ab_max_scenes_per_property`), chosen to mix calm and risky scenes and countries.
 Because the pipeline's path covers only where the car actually drives, the path properties pass mostly in scenes
 where the car moves; the highlight properties act on pedestrians and pass mostly in the risky scenes. Both limit how
@@ -434,7 +447,9 @@ uv run pytest
   the first participant per address and then replaces the addresses with placeholders, as in
   [Bazilinskyy et al., 2022](https://doi.org/10.54941/ahfe1002444) ([data](https://doi.org/10.4121/19102133)).
 * **Published:** `export_public.py` writes the anonymised dataset (new random participant numbers instead of the
-  codes, no IP addresses, age in bands, open answers in a separate file to redact by hand):
+  codes, no IP addresses, age in bands, open answers in a separate file to redact by hand), with each participant's
+  exclusion flag and reasons, so the analysed N can be reproduced from the public data. `report.md` names the settings
+  file and a hash of the settings it used, since a local `config` silently replaces `default.config`:
 
   ```bash
   uv run python export_public.py --data /srv/study-data/entries.jsonl --out _output/public

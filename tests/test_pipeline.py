@@ -192,11 +192,15 @@ def test_subgroups_find_colour_vision_and_criticality_effects(config, design):
         rows = sub[(sub["property"] == prop) & (sub["factor"] == "criticality")].set_index("group")
         assert rows.loc["high", "prefer_high_share"] > rows.loc["low", "prefer_high_share"]
         assert rows["p_prefer_high_differs"].iloc[0] < 0.05
-    # people with a colour vision deficiency are left out of the colour properties' main results
+    # people with a colour vision deficiency are left out of the colour properties' main results,
+    # except where the property keeps them (the palette: its Okabe-Ito alternative is for them)
     cvd = {r["pid"] for r in records if r["demographics"].get("colour_vision_deficiency") == "Yes"}
     kept = set(result["participants"].query("not excluded")["pid"])
+    keeps = {p["id"] for p in load_properties(config) if p.get("keep_colour_vision_deficiency")}
+    assert keeps == {"palette_id"}
     for prop in COLOUR_DEPENDENT:
-        counted = sum(1 for r in records if r["pid"] in kept - cvd for p in r["ab"]
+        people = kept if prop in keeps else kept - cvd
+        counted = sum(1 for r in records if r["pid"] in people for p in r["ab"]
                       if p["property"] == prop and not p["catch"])
         assert result["summary"].loc[prop, "ab_n"] == counted
 

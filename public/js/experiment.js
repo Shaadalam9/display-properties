@@ -269,7 +269,8 @@ function buildTimeline(design) {
     if (!debug) {
         timeline.push({
             type: jsPsychBrowserCheck,
-            features: ['width', 'height', 'browser', 'browser_version', 'mobile', 'os'],
+            // only what the device check needs (as in the DMP: browser type and screen size)
+            features: ['width', 'height', 'browser', 'mobile'],
             minimum_width: 1280,
             minimum_height: 720,
             inclusion_function: function(data) { return !data.mobile; },

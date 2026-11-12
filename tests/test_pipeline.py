@@ -348,3 +348,18 @@ def test_heterogeneity_tells_stable_types_from_coin_flips():
     assert abs(icc_two(*flips)) < 0.12
     consensus = np.where(rng.random((2, 400)) < 0.9, 1.0, -1.0)  # everyone prefers high, with slips
     assert abs(icc_two(*consensus)) < 0.12
+
+
+def test_scrubbed_file_has_no_ips_and_the_same_exclusions(config, design, tmp_path):
+    from scrub_ips import scrub
+    documents, _ = simulate(design, n=6, seed=16)
+    for k, doc in enumerate(documents):
+        attentive(doc)["ip"] = f"203.0.113.{k}"
+    documents[4]["ip"] = documents[1]["ip"]           # a second participation from one address
+    scrubbed, n = scrub(documents)
+    assert n == 5 and "203.0.113" not in json.dumps(scrubbed)
+    properties = load_properties(config)
+    before = analyse(records_with_ips(documents, config, tmp_path), properties, config)["exclusions"]
+    after = analyse(records_with_ips(scrubbed, config, tmp_path), properties, config)["exclusions"]
+    assert before.set_index("pid")["reasons"].to_dict() == after.set_index("pid")["reasons"].to_dict()
+    assert scrub(scrubbed)[1] == 0                    # running it again changes nothing

@@ -45,5 +45,7 @@ served by the same server. Open `https://<address>/?debug=true` to try it.
 * `DATA_FILE` grows by one line per saved batch of trials; copy it to the project folder on TU/e
   storage regularly (it is already there if `DATA_FILE` points to that storage).
 * Analyse with `uv run python analysis.py --data /srv/study-data/entries.jsonl`.
-* When collection ends, stop the service (`sudo systemctl disable --now display-properties`)
-  and remove the stimuli and the data file from the server once they are archived.
+* When collection ends, stop the service (`sudo systemctl disable --now display-properties`).
+  Once payment is done, replace the IP addresses in the data file by placeholders
+  (`uv run python scrub_ips.py --data /srv/study-data/entries.jsonl --in-place`), as the data
+  management plan says, then archive it and remove the stimuli and the data file from the server.

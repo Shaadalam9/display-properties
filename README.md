@@ -446,6 +446,9 @@ uv run pytest
 * **IP addresses** are stored with the responses only to find people who take part more than once. The analysis keeps
   the first participant per address and then replaces the addresses with placeholders, as in
   [Bazilinskyy et al., 2022](https://doi.org/10.54941/ahfe1002444) ([data](https://doi.org/10.4121/19102133)).
+  When collection and payment are finished, `scrub_ips.py --data <file> --in-place` replaces them in the raw data
+  file itself, before it is archived; the same address keeps the same placeholder, so the duplicate check gives the
+  same result.
 * **Published:** `export_public.py` writes the anonymised dataset (new random participant numbers instead of the
   codes, no IP addresses, age in bands, open answers in a separate file to redact by hand), with each participant's
   exclusion flag and reasons, so the analysed N can be reproduced from the public data. `report.md` names the settings
@@ -469,7 +472,8 @@ uv run pytest
 | `deploy/` | deployment: `heroku.sh`, or a server of our own (`README.md`) |
 | `avprops/` | Python package: scanning, geometry, rendering, design, data reading, analysis, publication |
 | `scan_videos.py`, `extract_geometry.py`, `render_stimuli.py`, `make_design.py` | making the stimuli and the design |
-| `analysis.py`, `payments.py`, `export_public.py`, `simulate.py` | analysis, payments, publication, simulation |
+| `analysis.py`, `payments.py`, `scrub_ips.py`, `export_public.py`, `simulate.py` | analysis, payments, removing the IP addresses, publication, simulation |
+| `propose_events.py` | event windows proposed from the geometry, with sheets to check them |
 | `make_figures.py`, `docs/figures/` | the figures in this README |
 | `tests/` | tests (`uv run pytest`) |
 

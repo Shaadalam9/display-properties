@@ -263,6 +263,21 @@ def _two_answers(entries: list[tuple[int, dict]]) -> tuple[np.ndarray, np.ndarra
     return np.array(idx), np.array(first), np.array(second)
 
 
+def _majority_by_variant(pairs: list[dict]) -> str:
+    """For a property with several high levels (the palettes), the preference per alternative:
+    each is its own comparison with the low level, so pooling them could hide opposite results.
+    E.g. "okabe_ito: high 64% (n=50); minimalist_hud: low 58% (n=48)"; "" without variants."""
+    parts = []
+    for variant in sorted({p.get("high_variant") for p in pairs if p.get("high_variant")}):
+        chosen = [p["preferred_level"] for p in pairs
+                  if p.get("high_variant") == variant and p["preferred_level"] in ("high", "low")]
+        if chosen:
+            high = chosen.count("high") / len(chosen)
+            level, share = ("high", high) if high >= 0.5 else ("low", 1 - high)
+            parts.append(f"{variant}: {level} {share:.0%} (n={len(chosen)})")
+    return "; ".join(parts)
+
+
 def ab_summary(records: list[dict], prop_ids: list[str], skip_cvd_for: set[str] | None = None) -> pd.DataFrame:
     """A/B results per property. Participants who report a colour vision deficiency are
     left out of the properties in ``skip_cvd_for``."""
@@ -290,6 +305,7 @@ def ab_summary(records: list[dict], prop_ids: list[str], skip_cvd_for: set[str] 
             "importance_mean": float(np.mean([p["importance"] for p in pairs])) if pairs else np.nan,
             "H": icc_two(first, second),
             "H_n": len(first),
+            "majority_by_variant": _majority_by_variant(pairs),
         }
         for key in RATING_KEYS:
             diffs = [p["ratings"]["high"][key] - p["ratings"]["low"][key] for p in pairs if p.get("ratings")]
@@ -468,6 +484,8 @@ def select_properties(summary: pd.DataFrame, properties: list[dict], config: dic
             status[prop] = "selected"
         elif not row["noticed_corrected"] >= config["noticed_min_share"]:
             status[prop] = "not noticed"
+        elif prop not in tunable and row.get("majority_by_variant"):
+            status[prop] = f"categorical: settle per alternative ({row['majority_by_variant']})"
         elif prop not in tunable:
             status[prop] = f"categorical: settle at {row['majority_level']}" if row["majority_level"] \
                 else "categorical: no preference data"

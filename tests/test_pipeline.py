@@ -2,6 +2,7 @@ import itertools
 import json
 
 import numpy as np
+import pandas as pd
 import pytest
 
 from avprops.analysis import analyse, expected_trials
@@ -363,3 +364,67 @@ def test_scrubbed_file_has_no_ips_and_the_same_exclusions(config, design, tmp_pa
     after = analyse(records_with_ips(scrubbed, config, tmp_path), properties, config)["exclusions"]
     assert before.set_index("pid")["reasons"].to_dict() == after.set_index("pid")["reasons"].to_dict()
     assert scrub(scrubbed)[1] == 0                    # running it again changes nothing
+
+
+def test_plans_follow_the_design(design):
+    from avprops.design import expand_plan
+    kind = {p["id"]: p["type"] for p in design["properties"]}
+    ab = design["ab"]
+    for raw in design["plans"][:100]:
+        plan = expand_plan(raw, design)
+        pairs = [p for p in plan["pairs"] if not p["catch"] and p["property"] != "no_display"]
+        scenes = {}
+        for p in pairs:
+            assert p["scene"] in ab["scenes"][p["property"]]       # only scenes where the pair differs
+            assert {p["a_level"], p["b_level"]} == {"low", "high"}
+            scenes.setdefault(p["property"], []).append(p["scene"])
+        assert sum(kind[p] != "categorical" for p in scenes) == ab["tunable_per_participant"]
+        for prop, used in scenes.items():
+            assert len(set(used)) == len(used) == (1 if kind[prop] == "categorical" else ab["scenes_per_property"])
+        catches = [p for p in plan["pairs"] if p["catch"]]
+        assert len(catches) == ab["catch_pairs"] and all(p["a_level"] == p["b_level"] for p in catches)
+        assert sum(p["property"] == "no_display" for p in plan["pairs"]) == int(ab["no_display"])
+        shown = plan["pairs"]  # a property's two pairs are never shown one right after the other
+        assert not any(a["property"] == b["property"] and not a["catch"] and not b["catch"]
+                       for a, b in zip(shown, shown[1:]))
+
+
+def test_simulated_sessions_follow_their_logged_plan(config, design):
+    from avprops.crowd import plan_mismatches
+    documents, _ = simulate(design, n=20, seed=17, config=config)
+    records = records_from(documents, config)
+    assert all(r["plan_index"] is not None for r in records)
+    assert [plan_mismatches(r, design) for r in records] == [[] for _ in records]
+    # a drifted record is caught
+    records[0]["ab"][0]["scene"] = "somewhere_else"
+    assert plan_mismatches(records[0], design)
+
+
+def test_palette_is_reported_per_alternative(config, design):
+    documents, _ = simulate(design, n=300, seed=18, config=config)
+    summary = analyse(records_from(documents, config), load_properties(config), config)["summary"]
+    by_variant = summary.loc["palette_id", "majority_by_variant"]
+    assert all(v in by_variant for v in ("okabe_ito", "minimalist_hud", "high_saliency"))
+    assert summary.loc["path_width", "majority_by_variant"] == ""
+    if summary.loc["palette_id", "status"].startswith("categorical"):
+        assert "per alternative" in summary.loc["palette_id", "status"]
+
+
+def test_public_data_reproduce_the_analysis(config, design, tmp_path):
+    from avprops.analysis import apply_exclusions
+    from avprops.common import load_questionnaires
+    from avprops.publish import anonymise, load_public
+    documents, _ = simulate(design, n=120, seed=19, config=config)
+    for row in documents[0]["data"]:                    # one participant the analysis excludes
+        if row["task"] == "attention":
+            row["correct"] = False
+    records = records_from(documents, config)
+    properties, questionnaires = load_properties(config), load_questionnaires(config)
+    raw = analyse(records_from(documents, config), properties, config, questionnaires)
+    _, exclusions = apply_exclusions(records, config, properties)
+    for name, table in anonymise(records, seed=3, exclusions=exclusions).items():
+        table.to_csv(tmp_path / f"{name}.csv", index=False)
+    public = analyse(load_public(tmp_path, [q["id"] for q in questionnaires]), properties, config, questionnaires)
+    assert public["n_kept"] == raw["n_kept"] < 120     # the same participants kept
+    columns = ["bws_score", "noticed_corrected", "H", "H_n", "score", "majority_by_variant", "status"]
+    pd.testing.assert_frame_equal(public["summary"][columns].sort_index(), raw["summary"][columns].sort_index())

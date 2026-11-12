@@ -173,66 +173,26 @@ function buildTimeline(design) {
 
     var props = {};
     design.properties.forEach(function(p) { props[p.id] = p; });
-    // a property with variants (the palettes) has several high levels: draw one per use
-    var pickVariant = function(prop) {
-        var v = props[prop] && props[prop].variants;
-        return v ? v[Math.floor(Math.random() * v.length)] : null;
-    };
     var levelFile = function(prop, level, variant) {
         return prop + '_' + level + (level === 'high' && variant ? '_' + variant : '');
     };
 
-    // --- per-participant assignment
-    var bws_version = Math.floor(Math.random() * design.bws.versions.length);
+    // --- per-participant assignment: one of the plans made in Python (design.plans, see
+    // avprops/design.py build_plans), picked from the participant's code, so the experiment
+    // and simulate.py share every random assignment. A plan holds the BWS version, the A/B
+    // pairs in order (each tunable property in two scenes, categorical ones in one, catch
+    // pairs of one clip on both sides, display vs no display; sides and palette variants
+    // drawn) and the comprehension clips. It is logged in the first instructions row.
+    var LEVELS = ['low', 'high', 'none', 'baseline'];
+    var plan_index = Math.floor(Math.random() * design.plans.length);
+    var plan = design.plans[plan_index];
+    var variantName = function(k, v) { return k >= 0 && v >= 0 ? design.properties[k].variants[v] : null; };
+    var bws_version = plan.bws_version;
     var bws_trials = design.bws.versions[bws_version];
-    // each participant compares design.ab.tunable_per_participant tunable properties, each in
-    // design.ab.scenes_per_property different scenes, and design.ab.categorical_per_participant
-    // categorical ones in one scene, always in scenes where the clips visibly differ
-    // (design.ab.scenes, from render_stimuli.py --check). How well a participant's answers in
-    // the two scenes agree tells stable preferences from indifference (the heterogeneity H);
-    // categorical properties are settled by the majority, so one answer each is enough.
-    var flip = function() { return Math.random() < 0.5; };
-    var ofType = function(tunable) {
-        return Object.keys(props).filter(function(id) { return (props[id].type !== 'categorical') === tunable; });
-    };
-    var compared = jsPsych.randomization.shuffle(ofType(true)).slice(0, design.ab.tunable_per_participant)
-        .map(function(prop) { return [prop, design.ab.scenes_per_property]; })
-        .concat(jsPsych.randomization.shuffle(ofType(false)).slice(0, design.ab.categorical_per_participant)
-            .map(function(prop) { return [prop, 1]; }));
-    var ab_plan = [];
-    compared.forEach(function(entry) {
-            var prop = entry[0];
-            var variant = pickVariant(prop);  // the same palette in both scenes: one comparison
-            jsPsych.randomization.shuffle(design.ab.scenes[prop])
-                .slice(0, entry[1])
-                .forEach(function(scene) {
-                    var a_level = flip() ? 'low' : 'high';
-                    ab_plan.push({ property: prop, scene: scene, a_level: a_level,
-                                   b_level: a_level === 'low' ? 'high' : 'low', high_variant: variant });
-                });
-        });
-    // catch pairs: the same clip on both sides; "noticed a difference" here is a false alarm
-    for (var c = 0; c < design.ab.catch_pairs; c++) {
-        var catch_prop = Object.keys(props)[Math.floor(Math.random() * Object.keys(props).length)];
-        var catch_scenes = design.ab.scenes[catch_prop];
-        var catch_level = flip() ? 'low' : 'high';
-        ab_plan.push({ property: catch_prop, scene: catch_scenes[Math.floor(Math.random() * catch_scenes.length)],
-                       a_level: catch_level, b_level: catch_level, high_variant: pickVariant(catch_prop), catch: true });
-    }
-    // display vs no display: one extra pair
-    if (design.ab.no_display) {
-        var nd_a = flip() ? 'none' : 'baseline';
-        ab_plan.push({ property: 'no_display', scene: design.scenes[Math.floor(Math.random() * design.scenes.length)].id,
-                       a_level: nd_a, b_level: nd_a === 'none' ? 'baseline' : 'none' });
-    }
-    // random order in which a property's two pairs are not shown one after the other
-    var adjacent = function(plan) {
-        return plan.some(function(p, i) { return i > 0 && !p.catch && !plan[i - 1].catch && p.property === plan[i - 1].property; });
-    };
-    var pair_plan = jsPsych.randomization.shuffle(ab_plan);
-    for (var tries = 0; tries < 100 && adjacent(pair_plan); tries++) {
-        pair_plan = jsPsych.randomization.shuffle(ab_plan);
-    }
+    var pair_plan = plan.pairs.map(function(p) {
+        return { property: p[0] < 0 ? 'no_display' : design.properties[p[0]].id, scene: design.scenes[p[1]].id,
+                 a_level: LEVELS[p[2]], b_level: LEVELS[p[3]], high_variant: variantName(p[0], p[4]), catch: !!p[5] };
+    });
 
     // stimulus_url (config): stimuli/ when the server has the clips, or the URL where they are hosted
     var clip = function(scene, name) { return design.stimulus_url + scene + '/' + name + '.mp4'; };
@@ -242,12 +202,12 @@ function buildTimeline(design) {
     };
     var baseline_clip = clip(design.baseline_scene, 'baseline');
 
-    // comprehension: one clip per scene with a question, at a random level of one property
+    // comprehension: one clip per scene with a question, at the plan's level of one property
     // that visibly differs in that scene; the clip stops before the car acts
-    var comprehension_plan = design.comprehension.map(function(c) {
-        var prop = c.properties[Math.floor(Math.random() * c.properties.length)];
-        return { scene: c.scene, property: prop, level: Math.random() < 0.5 ? 'low' : 'high', spec: c,
-                 high_variant: pickVariant(prop), options: jsPsych.randomization.shuffle(c.options) };
+    var comprehension_plan = design.comprehension.map(function(c, k) {
+        var drawn = plan.comprehension[k];
+        return { scene: c.scene, property: design.properties[drawn[0]].id, level: LEVELS[drawn[1]], spec: c,
+                 high_variant: variantName(drawn[0], drawn[2]), options: jsPsych.randomization.shuffle(c.options) };
     });
 
     var timeline = [];
@@ -287,7 +247,7 @@ function buildTimeline(design) {
         type: jsPsychInstructions,
         pages: [STUDY_TEXT.welcome, STUDY_TEXT.consent],
         show_clickable_nav: true,
-        data: { task: 'instructions', bws_version: bws_version, ab_plan: pair_plan,
+        data: { task: 'instructions', plan_index: plan_index, bws_version: bws_version, ab_plan: pair_plan,
                 comprehension_plan: comprehension_plan.map(function(c) {
                     return { scene: c.scene, property: c.property, level: c.level, high_variant: c.high_variant };
                 }),

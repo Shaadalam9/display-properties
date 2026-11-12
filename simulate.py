@@ -29,6 +29,7 @@ import json
 import numpy as np
 
 from avprops.common import load_config, resolve, PROJECT_ROOT
+from avprops.design import expand_plan
 
 RATING_KEYS = ("understanding", "safety", "load")
 
@@ -162,7 +163,6 @@ def simulate(design: dict, n: int, seed: int, config: dict | None = None,
         population_truth(design, truth, config, np.random.default_rng(seed + 10_000))
     shared = truth["_global"]["redundant"]
     scene_meta = {sc["id"]: sc for sc in design["scenes"]}
-    variants_of = {p["id"]: p["variants"] for p in design["properties"] if p.get("variants")}
     points = design["ab"]["scale_points"]
     documents = []
     for i in range(n):
@@ -175,8 +175,12 @@ def simulate(design: dict, n: int, seed: int, config: dict | None = None,
 
         trust = float(rng.normal(0, 1))  # standardised propensity to trust
         utility = {p: truth[p]["importance"] + rng.normal(0, 0.7) for p in props}
-        version = int(rng.integers(len(design["bws"]["versions"])))
-        add("instructions", bws_version=version)
+        # the session's assignments come from the same plans the experiment uses
+        plan_index = int(rng.integers(len(design["plans"])))
+        plan = expand_plan(design["plans"][plan_index], design)
+        version = plan["bws_version"]
+        add("instructions", plan_index=plan_index, bws_version=version, ab_plan=plan["pairs"],
+            comprehension_plan=plan["comprehension"])
         add("consent", response={"consent": "Yes"}, rt=3000)
         country = str(rng.choice(COUNTRIES))
         cvd = bool(rng.random() < truth["_global"]["cvd_share"])
@@ -193,12 +197,12 @@ def simulate(design: dict, n: int, seed: int, config: dict | None = None,
                 value = (n_labels - 1) / 2 + lean * (n_labels - 1) / 4 + rng.normal(0, 0.5)
                 answers[item["id"]] = int(np.clip(round(value), 0, n_labels - 1))
             add("questionnaire", questionnaire=q["id"], response=answers)
-        for c in design["comprehension"]:
-            p = str(rng.choice(c["properties"]))
-            level = "low" if rng.random() < 0.5 else "high"
+        for c, drawn in zip(design["comprehension"], plan["comprehension"]):
+            p, level = drawn["property"], drawn["level"]
             correct = rng.random() < 0.6 + (truth[p]["comprehension_gain"] if level == "high" else 0.0)
-            add("comprehension", scene=c["scene"], property=p, level=level, expected=c["correct"],
-                answer=c["correct"] if correct else "other", correct=bool(correct), rt=4000, hidden=False)
+            add("comprehension", scene=c["scene"], property=p, level=level, high_variant=drawn["high_variant"],
+                expected=c["correct"], answer=c["correct"] if correct else "other", correct=bool(correct),
+                rt=4000, hidden=False)
         add("open_question", scene=design["baseline_scene"], response={"open": "Show why it brakes."},
             rt=20000, hidden=False)
         for t, items in enumerate(design["bws"]["versions"][version]):
@@ -224,34 +228,15 @@ def simulate(design: dict, n: int, seed: int, config: dict | None = None,
                 importance=int(np.clip(round((points + 1) / 2 + 1.2 * utility.get(prop, 0)), 1, points)),
                 rt=int(rng.integers(8000, 40000)), hidden=False)
 
-        plan = []
-        kind_of = {q["id"]: q.get("type") for q in design["properties"]}
-        tunable = [q for q in props if kind_of[q] != "categorical"]
-        categorical = [q for q in props if kind_of[q] == "categorical"]
-        compared = [(str(q), design["ab"]["scenes_per_property"])
-                    for q in rng.permutation(tunable)[: design["ab"]["tunable_per_participant"]]] + \
-                   [(str(q), 1) for q in rng.permutation(categorical)[: design["ab"]["categorical_per_participant"]]]
-        for p, n_scenes in compared:
-            variant = str(rng.choice(variants_of[p])) if p in variants_of else None
-            for scene in rng.permutation(design["ab"]["scenes"][p])[:n_scenes]:
-                plan.append(("pair", p, str(scene), variant))
-        for _ in range(design["ab"]["catch_pairs"]):
-            p = str(rng.choice(props))
-            plan.append(("catch", p, str(rng.choice(design["ab"]["scenes"][p])), None))
-        if design["ab"]["no_display"]:
-            plan.append(("no_display", "no_display", str(rng.choice([s["id"] for s in design["scenes"]])), None))
-        for k, j in enumerate(rng.permutation(len(plan))):
-            kind, p, scene, variant = plan[j]
-            if kind == "no_display":
-                a_level = "none" if rng.random() < 0.5 else "baseline"
-                b_level = "baseline" if a_level == "none" else "none"
+        for k, pair_plan in enumerate(plan["pairs"]):
+            p, scene, a_level, b_level = pair_plan["property"], pair_plan["scene"], pair_plan["a_level"], pair_plan["b_level"]
+            if p == "no_display":
                 wants = -1 if rng.random() < truth["_global"]["prefer_no_display"] else 1
                 pair(k, p, scene, a_level, b_level, wants if b_level == "baseline" else -wants, True)
-            elif kind == "catch":
-                level = "low" if rng.random() < 0.5 else "high"
+            elif pair_plan["catch"]:
                 noticed = bool(rng.random() < truth["_global"]["false_alarm"])
-                pair(k, p, scene, level, level, 0 if rng.random() < 0.7 else int(rng.choice([-1, 1])), noticed,
-                     catch=True)
+                pair(k, p, scene, a_level, b_level, 0 if rng.random() < 0.7 else int(rng.choice([-1, 1])), noticed,
+                     catch=True, variant=pair_plan["high_variant"])
             else:
                 notice_prob = truth[p]["notice_prob"] * (CVD_NOTICE_FACTOR if cvd and p in COLOUR_DEPENDENT else 1.0)
                 saw = bool(rng.random() < notice_prob)
@@ -259,10 +244,8 @@ def simulate(design: dict, n: int, seed: int, config: dict | None = None,
                 critical = scene_meta.get(scene, {}).get("criticality") == "high"
                 towards_high = answer(rng, lean[p] + (HIGH_CRITICALITY_EFFECT.get(p, 0.0) if critical else 0.0),
                                       saw, indifferent)
-                a_level = "low" if rng.random() < 0.5 else "high"
-                b_level = "high" if a_level == "low" else "low"
                 pair(k, p, scene, a_level, b_level, towards_high if b_level == "high" else -towards_high, noticed,
-                     variant=variant)
+                     variant=pair_plan["high_variant"])
         for _ in range(5):
             add("attention", correct=bool(rng.random() < 0.97))
         add("final", response={"comment": ""})

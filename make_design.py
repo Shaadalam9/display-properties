@@ -15,6 +15,14 @@ from avprops.common import load_config, load_properties, load_questionnaires, lo
 from avprops.design import build_design
 
 
+def design_json(design: dict) -> str:
+    """The design as JSON: readable, except the participant plans, one compact line each (every
+    participant downloads all of them)."""
+    rest = json.dumps({k: v for k, v in design.items() if k != "plans"}, indent=1)
+    plans = ",\n  ".join(json.dumps(plan, separators=(",", ":")) for plan in design.get("plans", []))
+    return rest[:-2] + ',\n "plans": [\n  ' + plans + "\n ]\n}\n"
+
+
 def required_clips(design: dict) -> list[str]:
     clips = [f"stimuli/{design['baseline_scene']}/baseline.mp4"]
     if design["ab"]["no_display"]:
@@ -40,7 +48,7 @@ def main() -> None:
 
     out = resolve(config["design_output"])
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps(design, indent=1), encoding="utf-8")
+    out.write_text(design_json(design), encoding="utf-8")
 
     n_trials = len(design["bws"]["versions"][0])
     print(f"Wrote {out.relative_to(PROJECT_ROOT)}")

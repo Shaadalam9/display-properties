@@ -140,6 +140,86 @@ def ab_counts(config: dict[str, Any], properties: list[dict[str, Any]]) -> tuple
             min(int(config["ab_categorical_per_participant"]), len(properties) - tunable))
 
 
+LEVELS = ("low", "high", "none", "baseline")  # level codes in the participant plans
+
+
+def build_plans(config: dict[str, Any], design: dict[str, Any], rng: np.random.Generator) -> list[dict[str, Any]]:
+    """The participant plans: every random assignment of a session, made once here, so the
+    experiment and simulate.py use the same ones (review by Mark Colley). Each participant
+    gets one plan (picked from their code); the plan is logged with their data.
+
+    A plan is ``{"bws_version": v, "pairs": [...], "comprehension": [...]}``, compact because
+    every participant downloads all of them:
+
+    * pair = [property index, scene index, A level, B level, variant index, catch], with the
+      indices into design["properties"] and design["scenes"], levels as indices into LEVELS,
+      variant -1 when the property has none, catch 0/1; property index -1 is the display vs
+      no display pair (levels "none"/"baseline");
+    * comprehension = [property index, level, variant index], one per design["comprehension"]
+      entry, in that order.
+
+    The pairs: ab.tunable_per_participant tunable properties, each in ab.scenes_per_property
+    different scenes, and ab.categorical_per_participant categorical ones in one scene; the low
+    and high level on random sides; one palette variant per property for all its scenes;
+    ab.catch_pairs pairs of one clip on both sides; the display vs no display pair; in random
+    order with no property's two pairs one after the other."""
+    props = design["properties"]
+    index = {p["id"]: k for k, p in enumerate(props)}
+    scene_index = {s["id"]: k for k, s in enumerate(design["scenes"])}
+    ab = design["ab"]
+    tunable = [p["id"] for p in props if p.get("type") != "categorical"]
+    categorical = [p["id"] for p in props if p.get("type") == "categorical"]
+
+    def variant(prop: str) -> int:
+        variants = props[index[prop]].get("variants")
+        return int(rng.integers(len(variants))) if variants else -1
+
+    plans = []
+    for _ in range(int(config.get("participant_plans", 500))):
+        pairs = []
+        compared = [(str(p), ab["scenes_per_property"]) for p in rng.permutation(tunable)[:ab["tunable_per_participant"]]] + \
+                   [(str(p), 1) for p in rng.permutation(categorical)[:ab["categorical_per_participant"]]]
+        for prop, n_scenes in compared:
+            v = variant(prop)
+            for scene in rng.permutation(ab["scenes"][prop])[:n_scenes]:
+                a_high = int(rng.random() < 0.5)
+                pairs.append([index[prop], scene_index[str(scene)], a_high, 1 - a_high, v, 0])
+        for _ in range(ab["catch_pairs"]):
+            prop = str(rng.choice([p["id"] for p in props]))
+            level = int(rng.random() < 0.5)
+            pairs.append([index[prop], scene_index[str(rng.choice(ab["scenes"][prop]))], level, level, variant(prop), 1])
+        if ab["no_display"]:
+            a_none = rng.random() < 0.5
+            pairs.append([-1, int(rng.integers(len(design["scenes"]))), 2 if a_none else 3, 3 if a_none else 2, -1, 0])
+        for _ in range(200):
+            order = [pairs[k] for k in rng.permutation(len(pairs))]
+            if not any(a[0] == b[0] >= 0 and not a[5] and not b[5] for a, b in zip(order, order[1:])):
+                break
+        comprehension = []
+        for c in design["comprehension"]:
+            prop = str(rng.choice(c["properties"]))
+            comprehension.append([index[prop], int(rng.random() < 0.5), variant(prop)])
+        plans.append({"bws_version": int(rng.integers(len(design["bws"]["versions"]))), "pairs": order,
+                      "comprehension": comprehension})
+    return plans
+
+
+def expand_plan(plan: dict[str, Any], design: dict[str, Any]) -> dict[str, Any]:
+    """A plan in words: the same structure the experiment logs in its first instructions row."""
+    props, scenes = design["properties"], design["scenes"]
+
+    def variant_name(k: int, v: int) -> str | None:
+        return props[k]["variants"][v] if k >= 0 and v >= 0 else None
+
+    pairs = [{"property": "no_display" if k < 0 else props[k]["id"], "scene": scenes[s]["id"],
+              "a_level": LEVELS[a], "b_level": LEVELS[b], "high_variant": variant_name(k, v), "catch": bool(c)}
+             for k, s, a, b, v, c in plan["pairs"]]
+    comprehension = [{"scene": spec["scene"], "property": props[k]["id"], "level": LEVELS[lv],
+                      "high_variant": variant_name(k, v)}
+                     for spec, (k, lv, v) in zip(design["comprehension"], plan["comprehension"])]
+    return {"bws_version": plan["bws_version"], "pairs": pairs, "comprehension": comprehension}
+
+
 def build_design(config: dict[str, Any], properties: list[dict[str, Any]],
                  scenes: list[dict[str, Any]], checked: dict | None = None,
                  questionnaires: list[dict[str, Any]] | None = None,
@@ -165,7 +245,7 @@ def build_design(config: dict[str, Any], properties: list[dict[str, Any]],
     if few:
         raise ValueError(f"each property is compared in {config['ab_scenes_per_property']} scenes, but these pass the "
                          f"check in fewer: {', '.join(few)}")
-    return {
+    design = {
         "study_id": config["study_id"],
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "properties": [
@@ -206,3 +286,5 @@ def build_design(config: dict[str, Any], properties: list[dict[str, Any]],
         "attention_fail_at": int(config["attention_fail_at"]),
         "stimulus_url": config.get("stimulus_url", "stimuli/"),
     }
+    design["plans"] = build_plans(config, design, np.random.default_rng(config["bws_design_seed"] + 1))
+    return design

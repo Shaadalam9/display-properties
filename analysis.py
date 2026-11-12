@@ -3,6 +3,7 @@
     uv run python analysis.py                                   # files_heroku in path_data
     uv run python analysis.py --data data/entries.jsonl         # local runs without MongoDB
     uv run python analysis.py --data data/simulated/entries.jsonl --out _output/simulated
+    uv run python analysis.py --public _output/public --out _output/from_public   # the published data
 
 With ``download_data`` true in config, the MongoDB collection is first exported into
 the first of ``files_heroku`` (needs mongoexport and ``mongodb_uri`` in secret).
@@ -137,8 +138,16 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--data", nargs="+", help="data files (default: files_heroku in path_data)")
     parser.add_argument("--out", default=config["output_dir"], help="output folder")
+    parser.add_argument("--public", help="folder with the published CSV files (export_public.py) instead of raw data")
     args = parser.parse_args()
 
+    if args.public:
+        # the published, anonymised data: the participants the original analysis kept
+        from avprops.publish import load_public
+        records = load_public(resolve(args.public), [q["id"] for q in load_questionnaires(config)])
+        result = analyse(records, load_properties(config), config, load_questionnaires(config), load_scenes(config))
+        write_outputs(result, config, resolve(args.out))
+        return
     if args.data:
         files = [resolve(f) for f in args.data]
     else:
@@ -153,8 +162,10 @@ def main() -> None:
     if not records:
         raise SystemExit("no participant data in " + ", ".join(str(f) for f in files))
     result = analyse(records, load_properties(config), config, load_questionnaires(config), load_scenes(config))
+    write_outputs(result, config, resolve(args.out))
 
-    out = resolve(args.out)
+
+def write_outputs(result: dict, config: dict, out) -> None:
     out.mkdir(parents=True, exist_ok=True)
     result["participants"].to_csv(out / "participants.csv", index=False)
     result["summary"].to_csv(out / "summary.csv", index_label="property")

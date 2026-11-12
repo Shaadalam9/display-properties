@@ -23,6 +23,7 @@ extract = [
 
 [dependency-groups]
 dev = [
+    "playwright>=1.48",
     "pytest>=8.3",
 ]
 

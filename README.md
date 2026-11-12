@@ -218,9 +218,13 @@ planned sample size it can only find large effects.
   <br><em>A ranking preview: highlight strength, subtle (left) and strong (right).</em>
 </p>
 
-Data is saved after every trial, so the answers of participants who stop early are kept. The order of trials, the BWS
-version (50 balanced versions), the scene per property and the side of each level are seeded with the participant's
-code.
+Data is saved after every trial, so the answers of participants who stop early are kept. Every random assignment of a
+session (the BWS version out of 50 balanced versions, which properties are compared in which scenes, the sides, the
+palette alternative, the catch pairs, the order of the pairs and the comprehension clips) comes from one of 500
+**participant plans** made in Python (`avprops/design.py`, `build_plans`) and stored in `public/design.json`. The
+experiment picks a plan from the participant's code and logs it in its first row; `simulate.py` uses the same plans, so
+the experiment and the simulation cannot drift apart, and `plan_mismatches` checks a session against the plan it
+logged.
 
 ## Making the stimuli
 
@@ -389,7 +393,8 @@ from people who do not care.
    probability of being selected, reported next to the choice.
 
 Every property gets a status: `selected`, `eligible, below cut-off`, `people agree: fix at low/high`, `categorical:
-settle at low/high` or `not noticed`.
+settle at low/high` (for the palette: per alternative, as each alternative is its own comparison with the
+standard palette) or `not noticed`.
 
 **Error rates and sample size.** `simulate.py` builds populations with properties of three kinds (consensus, two
 stable user types, indifference), indifferent responders, a redundant pair and false alarms, and computes the right
@@ -436,8 +441,22 @@ there is no `config`, `default.config` is used).
 ```bash
 uv run python simulate.py --n 150
 uv run python analysis.py --data data/simulated/entries.jsonl --out _output/simulated
-uv run pytest
 ```
+
+### Tests
+`uv run pytest` runs every test, including the front-end tests in `tests/test_frontend.py`, which make sure the front
+end and the Python side agree:
+
+* a **golden trace** (`tests/fixtures/golden_trace.jsonl`): one real session of the experiment, recorded in a headless
+  browser, must parse into a complete record that matches the plan it logged, contains every field `simulate.py`
+  writes, and goes through the analysis;
+* a **live session**: the current front end is run again by an automatic responder in a headless browser (Playwright),
+  with the same checks, so a change to the experiment is tested at once;
+* a **fault test**: the first save fails three times and the last one is slow; every trial must still be stored.
+
+The browser tests need Node.js (`npm install`) and Playwright's browser (`uv run playwright install chromium`); without
+them they are skipped. After a deliberate change to the experiment, record a new golden trace with
+`uv run python tests/frontend.py`. GitHub Actions (`.github/workflows/tests.yml`) runs all of it on every push.
 
 ## Data and privacy
 
@@ -458,6 +477,10 @@ uv run pytest
   uv run python export_public.py --data /srv/study-data/entries.jsonl --out _output/public
   ```
 
+  Anyone can rerun the analysis on the published files: `uv run python analysis.py --public _output/public` rebuilds
+  the records of the participants the original analysis kept (`avprops/publish.py`, `load_public`) and gives the same
+  N and results; a test checks this.
+
 * The participant information sheet and consent are in `public/js/study-text.js`; fill in the placeholders with the
   ethics-approved wording before the pilot.
 
@@ -475,7 +498,8 @@ uv run pytest
 | `analysis.py`, `payments.py`, `scrub_ips.py`, `export_public.py`, `simulate.py` | analysis, payments, removing the IP addresses, publication, simulation |
 | `propose_events.py` | event windows proposed from the geometry, with sheets to check them |
 | `make_figures.py`, `docs/figures/` | the figures in this README |
-| `tests/` | tests (`uv run pytest`) |
+| `tests/` | tests (`uv run pytest`); `tests/frontend.py` runs the experiment in a headless browser |
+| `.github/workflows/` | the tests on every push (GitHub Actions) |
 
 ## Footage
 

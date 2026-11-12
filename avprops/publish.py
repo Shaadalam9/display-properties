@@ -69,3 +69,55 @@ def anonymise(records: list[dict], seed: int | None = None,
     sort = lambda rows: pd.DataFrame(rows).sort_values("participant", kind="stable") if rows else pd.DataFrame()  # noqa: E731
     return {"participants": sort(participants), "bws": sort(bws), "ab": sort(ab),
             "comprehension": sort(comprehension), "open_answers": sort(open_answers)}
+
+
+def _value(v: Any) -> Any:
+    """A CSV cell as the analysis expects it: NaN -> None, numpy scalars -> Python."""
+    if v is None or (isinstance(v, float) and np.isnan(v)):
+        return None
+    return v.item() if hasattr(v, "item") else v
+
+
+def load_public(folder, questionnaire_ids: list[str] | None = None, kept_only: bool = True) -> list[dict]:
+    """Participant records rebuilt from the published CSV files (anonymise() writes them), so the
+    analysis can be rerun on the public data and N reproduced. With ``kept_only`` the participants
+    the original analysis excluded are left out (their flags are in participants.csv)."""
+    from pathlib import Path
+    folder = Path(folder)
+    read = lambda name: pd.read_csv(folder / f"{name}.csv") if (folder / f"{name}.csv").exists() \
+        else pd.DataFrame(columns=["participant"])  # noqa: E731
+    people, bws, ab, comprehension = read("participants"), read("bws"), read("ab"), read("comprehension")
+    questionnaire_ids = sorted(questionnaire_ids or [], key=len, reverse=True)
+    rows_of = {name: {pid: rows for pid, rows in table.groupby("participant")}
+               for name, table in (("bws", bws), ("ab", ab), ("comprehension", comprehension))}
+    records = []
+    for person in people.to_dict("records"):
+        if kept_only and bool(person.get("excluded")):
+            continue
+        pid = person["participant"]
+        questionnaires: dict[str, dict[str, int]] = {}
+        for column, value in person.items():
+            q = next((q for q in questionnaire_ids if column.startswith(q + "_")), None)
+            if q and _value(value) is not None:
+                questionnaires.setdefault(q, {})[column[len(q) + 1:]] = int(value)
+        wrong = int(_value(person.get("attention_wrong")) or 0)
+        empty = pd.DataFrame()
+        bws_rows = rows_of["bws"].get(pid, empty)
+        records.append({
+            "pid": pid, "debug": False, "consent": True, "finished": bool(person.get("finished")),
+            "demographics": {k: _value(person.get(k)) for k in DEMOGRAPHICS},
+            "questionnaires": questionnaires,
+            "attention": {"wrong": wrong, "passed": True},
+            "bws": [{"trial": int(r["trial"]), "items": str(r["items"]).split(";"), "best": r["best"],
+                     "worst": r["worst"], "rt_ms": _value(r["rt_ms"]), "hidden": bool(r["hidden"])}
+                    for r in bws_rows.to_dict("records")],
+            "ab": [{key: _value(r.get(key)) for key in (
+                        "index", "property", "scene", "a_level", "b_level", "high_variant", "noticed",
+                        "preferred_level", "preference", "importance", "rt_ms")}
+                   | {"catch": bool(r.get("catch")), "hidden": bool(r.get("hidden")), "noticed": bool(r.get("noticed"))}
+                   for r in rows_of["ab"].get(pid, empty).to_dict("records")],
+            "comprehension": [{key: _value(r.get(key)) for key in (
+                                   "scene", "property", "level", "high_variant", "answer", "correct", "rt_ms", "hidden")}
+                              for r in rows_of["comprehension"].get(pid, empty).to_dict("records")],
+        })
+    return records

@@ -1,0 +1,31 @@
+# Every push and pull request: the Python tests, and the front-end tests that run the real
+# experiment in a headless browser (tests/test_frontend.py), so a change to either side that
+# breaks the other is caught before data collection.
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - uses: astral-sh/setup-uv@v6
+
+      - name: Install
+        run: |
+          npm ci
+          uv python install 3.12
+          uv sync --locked
+          uv run playwright install --with-deps chromium
+
+      - name: Test
+        run: uv run pytest -q

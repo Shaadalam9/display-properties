@@ -110,6 +110,9 @@ def rows_to_records(rows: list[dict], attention_max_wrong: int) -> list[dict[str
             response = t.get("response") or {}
             if task == "instructions" and "bws_version" in t:
                 record["bws_version"] = t["bws_version"]
+                record["plan_index"] = t.get("plan_index")
+                # the session's assignments as logged when it started, to check against what it did
+                record["logged_plan"] = {"ab": t.get("ab_plan") or [], "comprehension": t.get("comprehension_plan") or []}
             elif task == "consent":
                 record["consent"] = response.get("consent") == "Yes"
             elif task == "demographics":
@@ -142,3 +145,31 @@ def rows_to_records(rows: list[dict], attention_max_wrong: int) -> list[dict[str
         record["attention"] = {"shown": len(attention), "wrong": wrong, "passed": wrong <= attention_max_wrong}
         records.append(record)
     return records
+
+
+def plan_mismatches(record: dict[str, Any], design: dict[str, Any] | None = None) -> list[str]:
+    """Where a session's record differs from the plan it logged when it started (empty when it
+    matches field for field): its A/B pairs in order, its comprehension clips and, with the design,
+    its BWS trials. A front end and an analysis that drifted apart show up here."""
+    logged = record.get("logged_plan") or {}
+    problems = []
+    pairs = sorted(record.get("ab", []), key=lambda p: p.get("index", 0))
+    if len(pairs) != len(logged.get("ab", [])):
+        problems.append(f"{len(pairs)} A/B pairs, plan has {len(logged.get('ab', []))}")
+    for k, (done, planned) in enumerate(zip(pairs, logged.get("ab", []))):
+        for key in ("property", "scene", "a_level", "b_level", "high_variant", "catch"):
+            if done.get(key) != planned.get(key) and not (key == "catch" and not done.get(key) and not planned.get(key)):
+                problems.append(f"pair {k}: {key} {done.get(key)!r}, plan {planned.get(key)!r}")
+    done_c = record.get("comprehension", [])
+    if len(done_c) != len(logged.get("comprehension", [])):
+        problems.append(f"{len(done_c)} comprehension clips, plan has {len(logged.get('comprehension', []))}")
+    for k, (done, planned) in enumerate(zip(done_c, logged.get("comprehension", []))):
+        for key in ("scene", "property", "level", "high_variant"):
+            if done.get(key) != planned.get(key):
+                problems.append(f"comprehension {k}: {key} {done.get(key)!r}, plan {planned.get(key)!r}")
+    if design is not None and record.get("bws_version") is not None:
+        expected = design["bws"]["versions"][record["bws_version"]]
+        shown = [t["items"] for t in sorted(record.get("bws", []), key=lambda t: t["trial"])]
+        if shown != expected[:len(shown)] or len(shown) != len(expected):
+            problems.append("BWS trials differ from the logged version")
+    return problems

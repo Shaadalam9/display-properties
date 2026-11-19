@@ -1,4 +1,4 @@
-"""The anonymised dataset that is published (data management plan, question 19).
+"""The anonymised dataset that is published.
 
 The study's codes are already random (the Microworkers ID never reaches the data; only
 Microworkers can link a completion code to a worker, until payments.csv is deleted). For

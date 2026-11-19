@@ -117,6 +117,12 @@ def apply_exclusions(records: list[dict], config: dict,
             missing = missing_data(rec, expected)
             if missing:
                 reasons.append(f"incomplete data ({missing})")
+        if (rec.get("server_sessions") or 0) > 1:
+            reasons.append(f"rows from {rec['server_sessions']} browser sessions")
+        minimum = config.get("min_server_minutes")
+        if minimum and rec.get("finished") and rec.get("server_minutes") is not None \
+                and rec["server_minutes"] < minimum:
+            reasons.append(f"finished in {rec['server_minutes']:.1f} min by the server's clock")
         attention = rec.get("attention") or {}
         if not attention.get("passed", False):
             reasons.append(f"more than {config['attention_max_wrong']} wrong attention answers")

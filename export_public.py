@@ -1,6 +1,6 @@
 """Write the anonymised dataset for publication (e.g. on 4TU.ResearchData).
 
-    uv run python export_public.py --data /srv/study-data/entries.jsonl --out _output/public
+    uv run python export_public.py --data data/heroku_0.json --out _output/public
 
 Writes participants.csv, bws.csv, ab.csv, comprehension.csv and open_answers.csv (see
 avprops/publish.py for what is removed). Before publishing, read open_answers.csv, remove

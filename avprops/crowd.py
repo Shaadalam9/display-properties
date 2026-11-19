@@ -40,8 +40,12 @@ def read_rows(paths: Iterable[Path]) -> list[dict]:
         for doc in read_documents(path):
             data = doc.get("data", [])
             ip = doc.get("ip")
+            # what the server added to the batch: its session token's ID and start time and the
+            # time the batch arrived, by the server's clock (app.js)
+            server = {f"server_{k}": doc[k] for k in ("session", "started", "received") if doc.get(k) is not None}
             for row in data if isinstance(data, list) else [data]:
-                rows.append(dict(row, ip=ip) if ip and "ip" not in row else row)
+                row = dict(row, ip=ip) if ip and "ip" not in row else row
+                rows.append(dict(row, **server) if server else row)
     return rows
 
 
@@ -115,6 +119,9 @@ def rows_to_records(rows: list[dict], attention_max_wrong: int) -> list[dict[str
                 record["logged_plan"] = {"ab": t.get("ab_plan") or [], "comprehension": t.get("comprehension_plan") or []}
             elif task == "consent":
                 record["consent"] = response.get("consent") == "Yes"
+                # separate consent for the colour vision question (health data); without it the
+                # question is not asked and colour vision is unknown
+                record["consent_colour_vision"] = response.get("consent_colour_vision") == "Yes"
             elif task == "demographics":
                 record["demographics"].update(response)
             elif task == "open_question":
@@ -143,6 +150,14 @@ def rows_to_records(rows: list[dict], attention_max_wrong: int) -> list[dict[str
                 record["finished"] = True
         wrong = attention.count(False)
         record["attention"] = {"shown": len(attention), "wrong": wrong, "passed": wrong <= attention_max_wrong}
+        # the server's view of the session: how many session tokens the rows came with (a real
+        # session has one) and how long it took from opening the study to the last stored batch
+        sessions = {t["server_session"] for t in trials if t.get("server_session")}
+        started = [t["server_started"] for t in trials if t.get("server_started") is not None]
+        received = [t["server_received"] for t in trials if t.get("server_received") is not None]
+        record["server_sessions"] = len(sessions) if sessions else None
+        record["server_minutes"] = (round((max(received) - min(started)) / 60000, 2)
+                                    if started and received else None)
         records.append(record)
     return records
 

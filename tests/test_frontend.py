@@ -9,13 +9,15 @@
 
 import json
 import time
+import urllib.error
+import urllib.request
 
 import pytest
 
 from avprops.analysis import analyse
 from avprops.common import load_config, load_properties
 from avprops.crowd import plan_mismatches, read_rows, rows_to_records
-from tests.frontend import TRACE, available, run_session, server
+from tests.frontend import TRACE, available, run_session, server, server_available
 
 CONFIG = load_config()
 
@@ -47,6 +49,7 @@ def assert_complete(record):
 def test_golden_trace_is_a_complete_session_that_follows_its_plan():
     record = record_from(TRACE)
     assert_complete(record)
+    assert record["server_sessions"] == 1 and record["consent_colour_vision"]
     result = analyse([dict(record, debug=False)], load_properties(CONFIG), CONFIG)
     assert result["n_records"] == 1 and len(result["summary"]) == len(load_properties(CONFIG))
 
@@ -60,7 +63,9 @@ def test_live_session_matches_its_plan(tmp_path):
     with server(data) as url:
         screens = run_session(url, "livecheck")
     assert screens.count("bws") == 13 and screens.count("pair") == 17
-    assert_complete(record_from(data))
+    record = record_from(data)
+    assert_complete(record)
+    assert record["server_sessions"] == 1 and record["server_minutes"] is not None
 
 
 @browser
@@ -83,3 +88,29 @@ def test_saves_survive_network_faults(tmp_path):
     indices = sorted({row["trial_index"] for row in read_rows([data])})
     assert indices == list(range(indices[-1] + 1)), "trials are missing"
     assert record["finished"] and record["consent"]
+
+
+def post(url, rows, token=None):
+    headers = {"Content-Type": "application/json"} | ({"X-Session": token} if token is not None else {})
+    request = urllib.request.Request(url + "/experiment-data", data=json.dumps(rows).encode(), headers=headers)
+    try:
+        return urllib.request.urlopen(request, timeout=5).status
+    except urllib.error.HTTPError as err:
+        return err.code
+
+
+@pytest.mark.skipif(bool(server_available()), reason=server_available() or "server available")
+def test_server_refuses_saves_without_a_valid_session(tmp_path):
+    data = tmp_path / "entries.jsonl"
+    rows = [{"worker_code": "fake", "trial_index": 0, "task": "final"}]
+    with server(data) as url:
+        token = json.loads(urllib.request.urlopen(url + "/session", timeout=5).read())["token"]
+        session_id, started, signature = token.split(".")
+        forged = f"{session_id}.{int(started) - 1}.{signature}"            # changed start time
+        other = f"{'0' * 24}.{started}.{signature}"                       # another session ID
+        assert [post(url, rows), post(url, rows, ""), post(url, rows, "x.y.z"),
+                post(url, rows, forged), post(url, rows, other)] == [403] * 5
+        assert not data.exists() or not data.read_text().strip()
+        assert post(url, rows, token) == 200
+    doc = json.loads(data.read_text())
+    assert doc["session"] == session_id and doc["started"] == int(started) and doc["received"] >= int(started)

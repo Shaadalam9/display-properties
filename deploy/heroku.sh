@@ -1,7 +1,4 @@
 #!/usr/bin/env bash
-# Not for this study: its data management plan (DMP-3509) requires the TU/e server (deploy/README.md).
-# Kept for studies that may use Heroku.
-#
 # Deploy the study to Heroku, as in bazilinskyy/ehmi-vehicles, but with the video clips:
 # the committed code (HEAD) plus only the clips the design needs and the ranking previews,
 # pushed straight to the Heroku app's own git. The clips never go to GitHub (third-party
@@ -11,7 +8,8 @@
 #   DRY_RUN=1 deploy/heroku.sh <app>     build and report the size, without pushing
 #
 # Needs: the Heroku CLI, logged in (heroku login), and the app's CONNECTION config variable
-# set to the MongoDB connection string (heroku config:set CONNECTION='...' -a <app>).
+# set to the MongoDB connection string (heroku config:set CONNECTION='...' -a <app>). The
+# session-token secret (SESSION_SECRET) is made here on the first deploy if the app has none.
 set -euo pipefail
 
 APP="${1:?usage: deploy/heroku.sh <heroku app name>}"
@@ -52,6 +50,12 @@ if [ -n "${DRY_RUN:-}" ]; then
     echo "DRY_RUN: not pushed"
     exit 0
 fi
+
+if [ -z "$(heroku config:get SESSION_SECRET -a "$APP")" ]; then
+    heroku config:set SESSION_SECRET="$(openssl rand -hex 32)" -a "$APP" >/dev/null
+    echo "SESSION_SECRET set on $APP"
+fi
+[ -n "$(heroku config:get CONNECTION -a "$APP")" ] || echo "warning: CONNECTION is not set on $APP" >&2
 
 cd "$BUILD"
 git init -q -b main

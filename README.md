@@ -176,7 +176,9 @@ flowchart TD
 ```
 
 1. **Consent and demographics:** age, nationality and country of residence, gender, driving licence, car use,
-   experience with driver assistance and self-driving cars, familiarity with head-up displays, colour vision.
+   experience with driver assistance and self-driving cars, familiarity with head-up displays, and colour vision, which
+   is health data and so is asked only after its own consent question on the consent page (optional; without it colour
+   vision is unknown).
 2. **Questionnaires** (`study/questionnaires.json`): propensity to trust automation (Körber 2019, 3 items) and
    affinity for technology interaction (ATI, Franke et al. 2019, 9 items), to test whether preferences split by user
    type.
@@ -326,20 +328,21 @@ URL parameters:
   when present; otherwise a random 14-character code is made.
 * `platform=<name>`: recruitment platform, stored with the data (e.g. `platform=microworkers`).
 
-**Hosting.** The live study runs on a TU/e-managed virtual server, as the approved data management plan (DMP-3509)
-requires: no participant data goes to an outside hosting, database or video service. `app.js` serves the experiment
-and the clips, writes the responses to `DATA_FILE` on TU/e storage, and nginx in front keeps no access log, so IP
-addresses are stored only with the responses. [`deploy/README.md`](deploy/README.md) has the setup (systemd unit,
-nginx configuration, steps). `deploy/heroku.sh` (Heroku with MongoDB, as in ehmi-vehicles) is kept for other
-studies, but is not allowed for this one under its DMP.
+**Hosting.** The live study runs on Heroku with a MongoDB database, as
+[ehmi-vehicles](https://github.com/bazilinskyy/ehmi-vehicles) does. `app.js` serves the experiment and the clips and
+stores the responses in MongoDB. The clips are not in git (third-party footage): `deploy/heroku.sh <app>` pushes the
+committed code plus the clips the design needs (about 260 MB) straight to the Heroku app. Setup and steps are in
+[`deploy/README.md`](deploy/README.md).
 
-**Recruitment on Microworkers.** Give the campaign the link `https://<server>/?platform=microworkers` and ask for the
+**Recruitment on Microworkers.** The campaign text and settings are in
+[docs/microworkers_campaign.md](docs/microworkers_campaign.md); the draft pre-registration, written from the code
+and settings, is [docs/preregistration.md](docs/preregistration.md). Give the campaign the link `https://<app>.herokuapp.com/?platform=microworkers` and ask for the
 completion code as proof. The link carries no worker ID: every participant gets a random code, which the finish page
 shows (and the attention-fail page too, for the partial payment), so only Microworkers can link a code to a worker. To
 approve submissions:
 
 ```bash
-uv run python payments.py --data /srv/study-data/entries.jsonl --check CODE1 CODE2 ...
+uv run python payments.py --data data/heroku_0.json --check CODE1 CODE2 ...
 ```
 
 `payments.csv` lists every code as `full` (reached the end), `partial` (stopped by the attention checks) or `none`,
@@ -430,6 +433,10 @@ there is no `config`, `default.config` is used).
   `max_hidden_ab_share`, and `exclude_duplicate_ip` (keep only the first participant from each IP address, as in
   [Bazilinskyy et al., 2022](https://doi.org/10.54941/ahfe1002444); only a session that ended, finished or stopped by
   the attention checks, counts as first, so a participant who reloads the page and finishes under a new code is kept).
+* Server checks (session token, see `app.js`): the server only stores rows sent with a token it issued when the
+  study page opened, and stores each batch with the session's start and arrival time by its own clock. Records whose
+  rows came from more than one session, and finished records that took less than `min_server_minutes` (8) from
+  opening the study to the last save, are excluded and flagged in `payments.csv` for review.
 * `study_id` and `design_versions`: records with another `study_id` are left out. When the kept participants saw more
   than one version of `design.json` (its `generated_at`), the analysis stops until `design_versions` lists the
   version(s) to analyse. Give the pilot its own `study_id`, so its data stay out of the main analysis.
@@ -465,8 +472,8 @@ them they are skipped. After a deliberate change to the experiment, record a new
 * **IP addresses** are stored with the responses only to find people who take part more than once. The analysis keeps
   the first participant per address and then replaces the addresses with placeholders, as in
   [Bazilinskyy et al., 2022](https://doi.org/10.54941/ahfe1002444) ([data](https://doi.org/10.4121/19102133)).
-  When collection and payment are finished, `scrub_ips.py --data <file> --in-place` replaces them in the raw data
-  file itself, before it is archived; the same address keeps the same placeholder, so the duplicate check gives the
+  When collection and payment are finished, `scrub_ips.py --data <file> --in-place` replaces them in the data
+  exported from MongoDB, before it is archived and the database is emptied; the same address keeps the same placeholder, so the duplicate check gives the
   same result.
 * **Published:** `export_public.py` writes the anonymised dataset (new random participant numbers instead of the
   codes, no IP addresses, age in bands, open answers in a separate file to redact by hand), with each participant's
@@ -474,15 +481,15 @@ them they are skipped. After a deliberate change to the experiment, record a new
   file and a hash of the settings it used, since a local `config` silently replaces `default.config`:
 
   ```bash
-  uv run python export_public.py --data /srv/study-data/entries.jsonl --out _output/public
+  uv run python export_public.py --data data/heroku_0.json --out _output/public
   ```
 
   Anyone can rerun the analysis on the published files: `uv run python analysis.py --public _output/public` rebuilds
   the records of the participants the original analysis kept (`avprops/publish.py`, `load_public`) and gives the same
   N and results; a test checks this.
 
-* The participant information sheet and consent are in `public/js/study-text.js`; fill in the placeholders with the
-  ethics-approved wording before the pilot.
+* The participant information sheet and consent are in `public/js/study-text.js`; fill in its placeholders (contact
+  details, withdrawal date) before the pilot.
 
 ## Repository layout
 
@@ -492,7 +499,7 @@ them they are skipped. After a deliberate change to the experiment, record a new
 | `reports/` | literature review behind the properties |
 | `public/` | the experiment (`views/`, `js/`, `css/`), `design.json`, and the clips in `stimuli/` (not in git) |
 | `app.js` | the server: serves the experiment and clips, stores the responses |
-| `deploy/` | deployment: `heroku.sh`, or a server of our own (`README.md`) |
+| `deploy/` | deployment to Heroku: `heroku.sh` and its steps (`README.md`) |
 | `avprops/` | Python package: scanning, geometry, rendering, design, data reading, analysis, publication |
 | `scan_videos.py`, `extract_geometry.py`, `render_stimuli.py`, `make_design.py` | making the stimuli and the design |
 | `analysis.py`, `payments.py`, `scrub_ips.py`, `export_public.py`, `simulate.py` | analysis, payments, removing the IP addresses, publication, simulation |

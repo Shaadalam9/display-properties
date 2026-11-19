@@ -1,5 +1,5 @@
-// Participant-facing text. The information sheet follows the data management plan; fill in
-// the [placeholders] and match it to the ethics-approved wording before the pilot.
+// Participant-facing text. Fill in the [placeholders] (contact details, withdrawal date) before
+// the pilot.
 // Strings may contain HTML.
 var STUDY_TEXT = {
     welcome:
@@ -14,8 +14,7 @@ var STUDY_TEXT = {
         '<h1>Information and consent</h1>' +
         '<div class="info-sheet">' +
         '<p><strong>Who we are.</strong> This study is run by researchers at Eindhoven University of Technology ' +
-        '(TU/e), the Netherlands [and partners, as in the approved application]. It has been approved by ' +
-        '[ethics committee, reference number].</p>' +
+        '(TU/e), the Netherlands.</p>' +
         '<p><strong>Purpose.</strong> We want to find out which parts of a display in a future self-driving car ' +
         'would help passengers understand what the car does and why.</p>' +
         '<p><strong>What you will do.</strong> Answer a few questions about yourself, watch short videos of traffic ' +
@@ -27,11 +26,14 @@ var STUDY_TEXT = {
         'If the study is ended early because of incorrect answers to the screening questions, you receive a ' +
         'partial payment.</p>' +
         '<p><strong>Your data.</strong> We record your answers, response times, age, gender, nationality, country of ' +
-        'residence, driving experience, colour vision (you may choose "prefer not to say") and the type of browser ' +
-        'and screen. We do not ask for your name, email address or exact location. Your IP address is stored ' +
+        'residence, driving experience and the type of browser and screen. ' +
+        '<strong>Colour vision</strong> is health data, so we ask about it only if you agree separately below; ' +
+        'you can take part without it, and you may still choose "prefer not to say". We use it only to check ' +
+        'whether people with a colour vision deficiency see the colours of the display differently. We do not ask for your name, email address or exact location. Your IP address is stored ' +
         'with your answers only to detect people who take part more than once; it is then replaced by a ' +
-        'placeholder and never published. The data are stored on servers of Eindhoven University of Technology; ' +
-        'no other organisation receives your answers. An anonymised version of the data ' +
+        'placeholder and never published. During the study your answers are stored in an online database ' +
+        '(MongoDB Atlas) behind the study website (Heroku); afterwards they are moved to storage of Eindhoven ' +
+        'University of Technology and deleted from the database. An anonymised version of the data ' +
         '(without codes or IP addresses, with age in ranges) will be published in an open research repository ' +
         'and used in scientific publications.</p>' +
         '<p><strong>Voluntary.</strong> Taking part is voluntary. You can stop at any time by closing this page, ' +
@@ -48,6 +50,9 @@ var STUDY_TEXT = {
         '<li>you take part voluntarily and know you can stop at any time.</li>' +
         '</ul>',
     consentQuestion: 'I am 18 years or older and agree to take part in this study as described above.',
+    // explicit, separate consent for the one health-data item (GDPR special category, as the data steward asked)
+    healthConsentQuestion: 'I agree that you ask me about my colour vision and use my answer as described above. ' +
+        '(Optional: you can take part without agreeing.)',
     declined: '<h1>Thank you</h1><p>You chose not to take part. You may now close this tab.</p>',
     comprehensionIntro:
         '<h1>What happens next?</h1>' +

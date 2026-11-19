@@ -1,11 +1,11 @@
 """Replace the IP addresses in the raw data file by placeholders, once they are no longer needed.
 
-    uv run python scrub_ips.py --data /srv/study-data/entries.jsonl            # writes entries.scrubbed.jsonl
-    uv run python scrub_ips.py --data /srv/study-data/entries.jsonl --in-place # replaces the file
+    uv run python scrub_ips.py --data data/heroku_0.json            # writes heroku_0.scrubbed.json
+    uv run python scrub_ips.py --data data/heroku_0.json --in-place # replaces the file
 
-The server stores each participant's IP address only to find people who take part more than once
-(data management plan, DMP-3509). Run this when data collection and payment are finished and before
-the raw data are archived: every address becomes a placeholder (0.0.0.1, 0.0.0.2, ... in order of
+The server stores each participant's IP address only to find people who take part more than once.
+Run this on the data exported from MongoDB when data collection and payment are finished and before
+the raw data are archived (then empty the database): every address becomes a placeholder (0.0.0.1, 0.0.0.2, ... in order of
 first appearance), the same one for the same address, so the duplicate check still gives the same
 result on the scrubbed file, but the addresses themselves are gone.
 """

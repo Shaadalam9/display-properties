@@ -1,6 +1,8 @@
 # Instance specific files: local settings and secrets.
 config
 secret
+# the study server's session-token secret (app.js), kept next to its data file
+session.secret
 
 # Participant data and analysis output (personal data) never go into git.
 data/

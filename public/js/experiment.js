@@ -69,6 +69,7 @@ var jsPsych = initJsPsych({
 jsPsych.randomization.setSeed(worker_code);
 
 var last_saved_index = -1;  // trial_index of the last row sent to the server
+var session_token = '';     // from the server when the page opens (GET /session), sent with every save
 
 /**
  * Save data. Sends only rows not sent before. The optional callback runs once the data is
@@ -92,7 +93,8 @@ function saveData(on_done) {
     var send = function(attempt) {
         // keepalive lets the request finish when the page is left meanwhile; browsers allow it
         // only for small bodies (64 kB)
-        fetch('experiment-data', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body,
+        fetch('experiment-data', { method: 'POST', body: body,
+                                   headers: { 'Content-Type': 'application/json', 'X-Session': session_token },
                                    keepalive: new Blob([body]).size < 60000 })
             .then(function(response) {
                 if (!response.ok) throw new Error('HTTP ' + response.status);
@@ -229,7 +231,7 @@ function buildTimeline(design) {
     if (!debug) {
         timeline.push({
             type: jsPsychBrowserCheck,
-            // only what the device check needs (as in the DMP: browser type and screen size)
+            // only what the device check needs: browser type and screen size
             features: ['width', 'height', 'browser', 'mobile'],
             minimum_width: 1280,
             minimum_height: 720,
@@ -255,7 +257,9 @@ function buildTimeline(design) {
     });
     timeline.push({
         type: jsPsychSurveyMultiChoice,
-        questions: [{ prompt: STUDY_TEXT.consentQuestion, name: 'consent', options: ['Yes', 'No'], required: true }],
+        questions: [{ prompt: STUDY_TEXT.consentQuestion, name: 'consent', options: ['Yes', 'No'], required: true },
+                    { prompt: STUDY_TEXT.healthConsentQuestion, name: 'consent_colour_vision', options: ['Yes', 'No'],
+                      required: true }],
         data: { task: 'consent' },
         on_finish: function(data) {
             if (data.response.consent !== 'Yes') {
@@ -305,10 +309,22 @@ function buildTimeline(design) {
             { prompt: 'How often do you travel by car (as driver or passenger)?', name: 'car_frequency', options: ['Daily', 'A few times a week', 'A few times a month', 'Rarely or never'], required: true },
             { prompt: 'How much experience do you have with driver-assistance or self-driving features?', name: 'automation_experience', options: ['None', 'A little', 'Some', 'A lot'], required: true },
             { prompt: 'Have you ever ridden in a car that drives itself?', name: 'av_ride', options: ['Yes', 'No'], required: true },
-            { prompt: 'How familiar are you with head-up or augmented-reality displays in cars?', name: 'ar_familiarity', options: ['Not at all', 'Slightly', 'Moderately', 'Very'], required: true },
-            { prompt: 'Do you have any form of colour vision deficiency (colour blindness)?', name: 'colour_vision_deficiency', options: ['Yes', 'No', 'Not sure', 'Prefer not to say'], required: true }
+            { prompt: 'How familiar are you with head-up or augmented-reality displays in cars?', name: 'ar_familiarity', options: ['Not at all', 'Slightly', 'Moderately', 'Very'], required: true }
         ],
         data: { task: 'demographics' }
+    });
+    // colour vision is health data: asked only after the separate, explicit consent for it
+    timeline.push({
+        timeline: [{
+            type: jsPsychSurveyMultiChoice,
+            preamble: '<h1>About you</h1>',
+            questions: [{ prompt: 'Do you have any form of colour vision deficiency (colour blindness)?', name: 'colour_vision_deficiency', options: ['Yes', 'No', 'Not sure', 'Prefer not to say'], required: true }],
+            data: { task: 'demographics' }
+        }],
+        conditional_function: function() {
+            var consent = jsPsych.data.get().filter({ task: 'consent' }).last(1).values()[0];
+            return Boolean(consent && consent.response.consent_colour_vision === 'Yes');
+        }
     });
 
     // --- questionnaires (study/questionnaires.json); answers are stored as 1..n
@@ -525,12 +541,18 @@ function buildTimeline(design) {
     return timeline;
 }
 
-fetch('design.json', { cache: 'no-store' })
-    .then(function(response) {
-        if (!response.ok) throw new Error('design.json: HTTP ' + response.status);
+function getJson(url) {
+    return fetch(url, { cache: 'no-store' }).then(function(response) {
+        if (!response.ok) throw new Error(url + ': HTTP ' + response.status);
         return response.json();
+    });
+}
+
+Promise.all([getJson('design.json'), getJson('session')])
+    .then(function(loaded) {
+        session_token = loaded[1].token;
+        jsPsych.run(buildTimeline(loaded[0]));
     })
-    .then(function(design) { jsPsych.run(buildTimeline(design)); })
     .catch(function(err) {
         document.body.innerHTML = '<p>The study could not be loaded. Please reload the page.</p>';
         console.error(err);

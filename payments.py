@@ -1,6 +1,6 @@
 """List every completion code with the payment it earns, to approve submissions on Microworkers.
 
-    uv run python payments.py --data /srv/study-data/entries.jsonl
+    uv run python payments.py --data data/heroku_0.json
 
 Participants paste the code from the finish page into Microworkers as proof. A code earns:
     full     the participant reached the end of the study

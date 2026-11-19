@@ -78,12 +78,19 @@ def free_port() -> int:
         return s.getsockname()[1]
 
 
-def available() -> str:
-    """Why the browser tests cannot run here ("" when they can)."""
+def server_available() -> str:
+    """Why the study server cannot run here ("" when it can)."""
     if shutil.which("node") is None:
         return "Node.js is not installed"
     if not (ROOT / "node_modules" / "jspsych").exists():
         return "npm install has not been run"
+    return ""
+
+
+def available() -> str:
+    """Why the browser tests cannot run here ("" when they can)."""
+    if server_available():
+        return server_available()
     try:
         from playwright.sync_api import sync_playwright
         with sync_playwright() as p:
@@ -144,14 +151,14 @@ def run_session(url: str, worker_code: str, route: Callable | None = None, timeo
 
 def record_trace() -> None:
     """Record a new golden trace: one session's rows, as the server stores them."""
-    data = TRACE.with_suffix(".tmp")
-    data.unlink(missing_ok=True)
-    with server(data) as url:
-        run_session(url, "goldentrace")
-    lines = [line for line in data.read_text().splitlines() if line.strip()]
+    import tempfile
+    with tempfile.TemporaryDirectory() as folder:   # the server also keeps its session secret there
+        data = Path(folder) / "entries.jsonl"
+        with server(data) as url:
+            run_session(url, "goldentrace")
+        lines = [line for line in data.read_text().splitlines() if line.strip()]
     TRACE.parent.mkdir(parents=True, exist_ok=True)
     TRACE.write_text("\n".join(lines) + "\n")
-    data.unlink()
     print(f"{len(lines)} saved batches -> {TRACE}")
 
 

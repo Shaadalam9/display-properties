@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from avprops.analysis import analyse, expected_trials
+from avprops.analysis import analyse, apply_exclusions, expected_trials
 from avprops.common import load_config, load_properties, load_scenes
 from avprops.crowd import read_documents, read_rows, rows_to_records
 from avprops.design import build_design, bws_version
@@ -428,3 +428,38 @@ def test_public_data_reproduce_the_analysis(config, design, tmp_path):
     assert public["n_kept"] == raw["n_kept"] < 120     # the same participants kept
     columns = ["bws_score", "noticed_corrected", "H", "H_n", "score", "majority_by_variant", "status"]
     pd.testing.assert_frame_equal(public["summary"][columns].sort_index(), raw["summary"][columns].sort_index())
+
+
+def test_server_session_checks():
+    """Rows of one code from two session tokens, or a completion faster than the server's clock
+    allows, are excluded (and so flagged for the payment review)."""
+    from avprops.crowd import rows_to_records
+    config = load_config()
+
+    def rows(code, session, started, received):
+        meta = {"server_session": session, "server_started": started, "server_received": received}
+        return [{"worker_code": code, "trial_index": 0, "task": "consent", "response": {"consent": "Yes"}, **meta},
+                {"worker_code": code, "trial_index": 1, "task": "final", "response": {}, **meta}]
+
+    minute = 60000
+    data = (rows("ok", "a", 0, 25 * minute) + rows("fast", "b", 0, 3 * minute)
+            + rows("two", "c", 0, 20 * minute)[:1] + rows("two", "d", 0, 30 * minute)[1:])
+    records = {r["pid"]: r for r in rows_to_records(data, config["attention_max_wrong"])}
+    assert records["ok"]["server_sessions"] == 1 and records["ok"]["server_minutes"] == 25
+    _, table = apply_exclusions(list(records.values()), config)
+    reasons = table.set_index("pid")["reasons"]
+    assert "browser sessions" not in reasons["ok"] and "server's clock" not in reasons["ok"]
+    assert "finished in 3.0 min by the server's clock" in reasons["fast"]
+    assert "rows from 2 browser sessions" in reasons["two"]
+
+
+def test_colour_vision_needs_its_own_consent():
+    """Colour vision is health data: the record keeps whether its separate consent was given, and
+    without the answer the participant counts in neither colour vision group."""
+    from avprops.analysis import has_cvd
+    rows = [{"worker_code": "a", "trial_index": 0, "task": "consent",
+             "response": {"consent": "Yes", "consent_colour_vision": "No"}},
+            {"worker_code": "a", "trial_index": 1, "task": "demographics", "response": {"gender": "Male"}}]
+    record = rows_to_records(rows, 1)[0]
+    assert record["consent"] and not record["consent_colour_vision"]
+    assert "colour_vision_deficiency" not in record["demographics"] and not has_cvd(record)

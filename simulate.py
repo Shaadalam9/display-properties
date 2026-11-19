@@ -181,7 +181,7 @@ def simulate(design: dict, n: int, seed: int, config: dict | None = None,
         version = plan["bws_version"]
         add("instructions", plan_index=plan_index, bws_version=version, ab_plan=plan["pairs"],
             comprehension_plan=plan["comprehension"])
-        add("consent", response={"consent": "Yes"}, rt=3000)
+        add("consent", response={"consent": "Yes", "consent_colour_vision": "Yes"}, rt=3000)
         country = str(rng.choice(COUNTRIES))
         cvd = bool(rng.random() < truth["_global"]["cvd_share"])
         add("demographics", response={"age": "30"})

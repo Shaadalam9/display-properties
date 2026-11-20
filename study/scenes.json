@@ -131,7 +131,7 @@
     "start_s": 978.0,
     "city": "Rotterdam"
    },
-   "event_checked": false
+   "event_checked": true
   },
   {
    "id": "rotterdam_risky",
@@ -155,7 +155,7 @@
     "start_s": 2543.0,
     "city": "Rotterdam"
    },
-   "event_checked": false
+   "event_checked": true
   },
   {
    "id": "valencia_calm",
@@ -179,7 +179,7 @@
     "start_s": 2414.0,
     "city": "Valencia"
    },
-   "event_checked": false
+   "event_checked": true
   },
   {
    "id": "valencia_risky",
@@ -203,7 +203,7 @@
     "start_s": 2655.0,
     "city": "Valencia"
    },
-   "event_checked": false
+   "event_checked": true
   },
   {
    "id": "chicago_calm",
@@ -233,7 +233,7 @@
     "start_s": 712.0,
     "city": "Chicago"
    },
-   "event_checked": false
+   "event_checked": true
   },
   {
    "id": "chicago_risky",
@@ -257,7 +257,7 @@
     "start_s": 3555.0,
     "city": "Chicago"
    },
-   "event_checked": false
+   "event_checked": true
   },
   {
    "id": "mexico_city_calm",
@@ -281,7 +281,7 @@
     "start_s": 2370.0,
     "city": "Mexico City"
    },
-   "event_checked": false
+   "event_checked": true
   },
   {
    "id": "mexico_city_risky",
@@ -311,7 +311,7 @@
     "start_s": 160.0,
     "city": "Mexico City"
    },
-   "event_checked": false
+   "event_checked": true
   },
   {
    "id": "jaipur_calm",
@@ -335,7 +335,7 @@
     "start_s": 850.0,
     "city": "Jaipur"
    },
-   "event_checked": false
+   "event_checked": true
   },
   {
    "id": "jaipur_risky",
@@ -359,7 +359,7 @@
     "start_s": 90.5,
     "city": "Jaipur"
    },
-   "event_checked": false
+   "event_checked": true
   },
   {
    "id": "hanoi_calm",
@@ -383,7 +383,7 @@
     "start_s": 364.0,
     "city": "Hanoi"
    },
-   "event_checked": false
+   "event_checked": true
   },
   {
    "id": "hanoi_risky",
@@ -407,7 +407,7 @@
     "start_s": 493.0,
     "city": "Hanoi"
    },
-   "event_checked": false
+   "event_checked": true
   },
   {
    "id": "kobe_calm",
@@ -431,7 +431,7 @@
     "start_s": 632.0,
     "city": "Kobe"
    },
-   "event_checked": false
+   "event_checked": true
   },
   {
    "id": "kobe_risky",
@@ -455,7 +455,7 @@
     "start_s": 1452.0,
     "city": "Kobe"
    },
-   "event_checked": false
+   "event_checked": true
   },
   {
    "id": "sydney_calm",
@@ -479,7 +479,7 @@
     "start_s": 242.0,
     "city": "Sydney"
    },
-   "event_checked": false
+   "event_checked": true
   },
   {
    "id": "sydney_risky",
@@ -509,7 +509,7 @@
     "start_s": 1902.5,
     "city": "Sydney"
    },
-   "event_checked": false
+   "event_checked": true
   }
  ]
 }

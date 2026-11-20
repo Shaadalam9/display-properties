@@ -313,8 +313,43 @@ class ClipRenderer:
         self._speed = self._speed_track()
         self._confidence = self._confidence_track()
         self._tracks = self._track_positions()
+        self._markers = self._marker_tracks()
 
     # --- per-clip tracks
+
+    def _marker_tracks(self, smooth_s: float = 0.15, gap_s: float = 0.3) -> dict[int, list[dict]]:
+        """Pedestrian markers per frame, smoothed along each track. The detector's box jitters
+        from frame to frame and sometimes misses a frame, so a marker drawn on the raw box
+        jumps and blinks. Per track: gaps up to ``gap_s`` are filled by linear interpolation,
+        then centre, top and scale are averaged over a centred window of +-``smooth_s`` (a
+        centred window does not lag behind steady movement). Untracked detections (no tid)
+        are drawn raw in ``_draw_highlights``."""
+        raw: dict[int, dict[int, tuple[np.ndarray, dict]]] = {}
+        for idx, f in enumerate(self.geometry.frames):
+            for det in self._pedestrians(f):
+                tid = int(det.get("tid", -1))
+                if tid < 0:
+                    continue
+                x0, y0, x1, y1 = det["box"]
+                px_per_m = self.camera.focal / max(5.0, float(det["dist"])) if det.get("dist") else (y1 - y0) / 1.7
+                raw.setdefault(tid, {})[idx] = (np.array([(x0 + x1) / 2, y0, px_per_m], float), det)
+        half, gap = max(1, int(round(smooth_s * self.fps))), max(1, int(round(gap_s * self.fps)))
+        markers: dict[int, list[dict]] = {}
+        for tid, track in raw.items():
+            idxs = sorted(track)
+            values = {i: track[i][0] for i in idxs}
+            dets = {i: track[i][1] for i in idxs}
+            for a, b in zip(idxs, idxs[1:]):
+                if 1 < b - a <= gap:
+                    for i in range(a + 1, b):
+                        w = (i - a) / (b - a)
+                        values[i] = (1 - w) * values[a] + w * values[b]
+                        dets[i] = dets[a]
+            for i in values:
+                window = [values[j] for j in range(i - half, i + half + 1) if j in values]
+                cx, top, px_per_m = np.mean(window, axis=0)
+                markers.setdefault(i, []).append({"cx": cx, "top": top, "px_per_m": px_per_m, "det": dets[i]})
+        return markers
 
     def _speed_track(self) -> np.ndarray:
         """km/h per frame from the travelled-metres phase (``ribbon.phase_m``), when the geometry has it."""
@@ -457,7 +492,7 @@ class ClipRenderer:
     def _colour_for(self, det: dict, style: Style, pal: dict):
         return pal["highlight"] if style.class_colours and det["kind"] == "vehicle" else pal["target"]
 
-    def _draw_highlights(self, ov: Overlay, frame: dict, style: Style, pal: dict) -> list[dict]:
+    def _draw_highlights(self, ov: Overlay, frame: dict, style: Style, pal: dict, index: int = 0) -> list[dict]:
         shape = (self.height, self.width)
         shown = self._shown(frame, style)
         thick = max(2, int(round(self.height / 300)))
@@ -481,18 +516,22 @@ class ClipRenderer:
                 ov.paint(_halo(m, style.contrast), (0, 0, 0), 0.6 * style.contrast)
                 ov.paint(m, colour, opacity)
         if style.marker_size > 0:
-            # markers go on every pedestrian, whichever road users are highlighted
+            # markers go on every pedestrian, whichever road users are highlighted; tracked
+            # ones follow the smoothed track (see _marker_tracks), untracked ones the raw box
+            marks = list(self._markers.get(index, []))
             for det in self._pedestrians(frame):
-                x0, y0, x1, y1 = (int(v) for v in det["box"])
+                if int(det.get("tid", -1)) < 0:
+                    x0, y0, x1, y1 = det["box"]
+                    px_per_m = self.camera.focal / max(5.0, float(det["dist"])) if det.get("dist") else (y1 - y0) / 1.7
+                    marks.append({"cx": (x0 + x1) / 2, "top": y0, "px_per_m": px_per_m, "det": det})
+            for mark in marks:
                 # marker_size is read as the marker's radius in metres, so it shrinks with
                 # distance like a real object; closer than 5 m it stops growing
-                px_per_m = (self.camera.focal / max(5.0, float(det["dist"])) if det.get("dist")
-                            else (y1 - y0) / 1.7)
-                r = max(2, int(round(style.marker_size * px_per_m)))
-                centre = ((x0 + x1) // 2, y0 - r - 4)
+                r = max(2, int(round(style.marker_size * mark["px_per_m"])))
+                centre = (int(round(mark["cx"])), int(round(mark["top"])) - r - 4)
                 m = _mask(shape, lambda m: cv2.circle(m, centre, r, 255, -1, cv2.LINE_AA))
                 ov.paint(_halo(m, max(style.contrast, 0.3)), (0, 0, 0), 0.5)
-                ov.paint(m, self._colour_for(det, style, pal), 0.95)
+                ov.paint(m, self._colour_for(mark["det"], style, pal), 0.95)
         return shown
 
     def _draw_predictions(self, ov: Overlay, frame_index: int, style: Style, pal: dict, shown: list[dict]) -> None:
@@ -620,7 +659,7 @@ class ClipRenderer:
             out *= 1 - (self._dim_mask(frame, style) * style.background_dim_alpha * strength)[..., None]
         ov = Overlay(self.width, self.height)
         self._draw_path(ov, frame, style, pal, index, occlusion)
-        shown = self._draw_highlights(ov, frame, style, pal)
+        shown = self._draw_highlights(ov, frame, style, pal, index)
         self._draw_predictions(ov, index, style, pal, shown)
         a = (ov.alpha * strength)[..., None]
         out = out * (1 - a) + ov.colour[..., ::-1] * a

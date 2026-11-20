@@ -80,3 +80,23 @@ def test_baseline_leaves_frames_untouched_outside_the_event(setup):
 def test_unknown_style_parameter_is_rejected():
     with pytest.raises(ValueError):
         Style.from_overrides(Style(), {"path_colour_of_my_choice": 1})
+
+
+def test_pedestrian_markers_are_smoothed_along_the_track():
+    """A jittery, briefly lost pedestrian still gets one steady marker that keeps up with it."""
+    geometry = synthetic_geometry()
+    rng = np.random.default_rng(0)
+    for f in geometry.frames:
+        px = 100 + f["i"] + rng.normal(0, 3)  # walks right at 1 px/frame, box jitters by about 3 px
+        f["persons"][0]["box"] = [px, 120, px + 10, 150]
+        f["persons"][0]["poly"] = None
+    for i in (30, 31, 32):  # the detector misses it for three frames
+        geometry.frames[i]["persons"] = []
+    renderer = ClipRenderer(geometry, SCENE)
+    track = {i: m["cx"] for i, marks in renderer._markers.items() for m in marks if m["det"].get("tid") == 1}
+    assert all(i in track for i in (30, 31, 32)), "a short gap leaves the marker in place"
+    raw = np.array([(f["persons"][0]["box"][0] + 5) for f in geometry.frames if f["persons"]])
+    smooth = np.array([track[i] for i in sorted(track)])
+    assert np.abs(np.diff(smooth, 2)).mean() < 0.3 * np.abs(np.diff(raw, 2)).mean(), "less jitter"
+    middle = np.array([track[i] - (105 + i) for i in range(10, 50)])
+    assert abs(middle.mean()) < 1.0, "the marker does not lag behind the walking pedestrian"

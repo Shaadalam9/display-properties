@@ -137,7 +137,8 @@ def test_new_measures_are_recovered(config, design):
     design = dict(design, questionnaires=[
         {k: q[k] for k in ("id", "name", "preamble", "labels")} | {"items": q["items"]}
         for q in load_questionnaires(config)])
-    documents, truth = simulate(design, n=400, seed=6, config=config)
+    # 800, not 400: with 400 the recovery varies too much with the seed (any plans)
+    documents, truth = simulate(design, n=800, seed=6, config=config)
     config = dict(config, colour_properties_without_cvd=False)  # count every pair (tested separately)
     result = analyse(records_from(documents, config), load_properties(config), config, load_questionnaires(config))
     assert abs(result["false_alarm_rate"] - truth["_global"]["false_alarm"]) < 0.05
@@ -388,6 +389,35 @@ def test_plans_follow_the_design(design):
         shown = plan["pairs"]  # a property's two pairs are never shown one right after the other
         assert not any(a["property"] == b["property"] and not a["catch"] and not b["catch"]
                        for a, b in zip(shown, shown[1:]))
+
+
+def test_plans_are_counterbalanced(design):
+    """Plans are handed out in turn, so any run of consecutive plans is balanced, as in a
+    counterbalanced design: BWS versions, compared properties, scenes per property and sides."""
+    from collections import Counter
+    from avprops.design import expand_plan
+    plans = [expand_plan(raw, design) for raw in design["plans"]]
+    n_versions = len(design["bws"]["versions"])
+    for start in range(0, len(plans) - n_versions + 1, n_versions):  # every block uses each version once
+        assert sorted(p["bws_version"] for p in plans[start:start + n_versions]) == list(range(n_versions))
+    real = [[q for q in p["pairs"] if not q["catch"]] for p in plans]
+    kind = {p["id"]: p["type"] for p in design["properties"]}
+    for group in (lambda k: kind[k] != "categorical", lambda k: kind[k] == "categorical"):
+        counts = Counter(q["property"] for pairs in real for q in pairs if q["property"] != "no_display" and group(q["property"]))
+        assert max(counts.values()) - min(counts.values()) <= 2 * design["ab"]["scenes_per_property"]
+    for prop, allowed in design["ab"]["scenes"].items():
+        scenes = Counter(q["scene"] for pairs in real for q in pairs if q["property"] == prop)
+        assert max(scenes.values()) - min(scenes.values()) <= 1 and set(scenes) == set(allowed)
+    for pairs in real:  # high level (or the display) on A in half of a participant's pairs
+        on_a = sum(q["a_level"] in ("high", "baseline") for q in pairs)
+        assert abs(on_a - len(pairs) / 2) <= 1
+        by_prop = {}
+        for q in pairs:
+            by_prop.setdefault(q["property"], []).append(q["a_level"])
+        assert all(sorted(levels) == ["high", "low"] for levels in by_prop.values() if len(levels) == 2)
+    for p in plans:  # catch pairs not at the start and not next to each other
+        catch = [k for k, q in enumerate(p["pairs"]) if q["catch"]]
+        assert all(k >= 2 for k in catch) and not any(b - a == 1 for a, b in zip(catch, catch[1:]))
 
 
 def test_simulated_sessions_follow_their_logged_plan(config, design):

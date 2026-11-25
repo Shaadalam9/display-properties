@@ -176,7 +176,7 @@ def simulate(design: dict, n: int, seed: int, config: dict | None = None,
         trust = float(rng.normal(0, 1))  # standardised propensity to trust
         utility = {p: truth[p]["importance"] + rng.normal(0, 0.7) for p in props}
         # the session's assignments come from the same plans the experiment uses
-        plan_index = int(rng.integers(len(design["plans"])))
+        plan_index = i % len(design["plans"])  # handed out in turn, as the server does
         plan = expand_plan(design["plans"][plan_index], design)
         version = plan["bws_version"]
         add("instructions", plan_index=plan_index, bws_version=version, ab_plan=plan["pairs"],
@@ -197,10 +197,12 @@ def simulate(design: dict, n: int, seed: int, config: dict | None = None,
                 value = (n_labels - 1) / 2 + lean * (n_labels - 1) / 4 + rng.normal(0, 0.5)
                 answers[item["id"]] = int(np.clip(round(value), 0, n_labels - 1))
             add("questionnaire", questionnaire=q["id"], response=answers)
-        for c, drawn in zip(design["comprehension"], plan["comprehension"]):
+        shown = rng.permutation(len(design["comprehension"])).tolist()  # in random order, as the front end
+        for k in shown:
+            c, drawn = design["comprehension"][k], plan["comprehension"][k]
             p, level = drawn["property"], drawn["level"]
             correct = rng.random() < 0.6 + (truth[p]["comprehension_gain"] if level == "high" else 0.0)
-            add("comprehension", scene=c["scene"], property=p, level=level, high_variant=drawn["high_variant"],
+            add("comprehension", index=k, scene=c["scene"], property=p, level=level, high_variant=drawn["high_variant"],
                 expected=c["correct"], answer=c["correct"] if correct else "other", correct=bool(correct),
                 rt=4000, hidden=False)
         add("open_question", scene=design["baseline_scene"], response={"open": "Show why it brakes."},

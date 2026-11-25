@@ -162,7 +162,7 @@ function choiceHtml(name, options) {
 /**
  * Build the timeline from design.json (written by make_design.py).
  */
-function buildTimeline(design) {
+function buildTimeline(design, assigned_plan) {
     jsPsych.data.addProperties({
         worker_code: worker_code,
         study_id: design.study_id,
@@ -186,7 +186,9 @@ function buildTimeline(design) {
     // pairs of one clip on both sides, display vs no display; sides and palette variants
     // drawn) and the comprehension clips. It is logged in the first instructions row.
     var LEVELS = ['low', 'high', 'none', 'baseline'];
-    var plan_index = Math.floor(Math.random() * design.plans.length);
+    // the server hands the plans out in turn (balanced); a random one only if it gave none (debug)
+    var plan_index = Number.isInteger(assigned_plan) && assigned_plan >= 0 && assigned_plan < design.plans.length
+        ? assigned_plan : Math.floor(Math.random() * design.plans.length);
     var plan = design.plans[plan_index];
     var variantName = function(k, v) { return k >= 0 && v >= 0 ? design.properties[k].variants[v] : null; };
     var bws_version = plan.bws_version;
@@ -345,7 +347,10 @@ function buildTimeline(design) {
     if (comprehension_plan.length) {
         timeline.push({ type: jsPsychInstructions, pages: [STUDY_TEXT.comprehensionIntro], show_clickable_nav: true });
     }
-    comprehension_plan.forEach(function(c, k) {
+    // shown in random order; index is the clip's place in the plan
+    var comprehension_order = jsPsych.randomization.shuffle(comprehension_plan.map(function(_, k) { return k; }));
+    comprehension_order.forEach(function(k) {
+        var c = comprehension_plan[k];
         timeline.push({
             type: jsPsychVideoButtonResponse,
             stimulus: [clip(c.scene, levelFile(c.property, c.level, c.high_variant))],
@@ -484,8 +489,13 @@ function buildTimeline(design) {
     var attention_wrong = 0;
     var questions = jsPsych.randomization.shuffle(ATTENTION_QUESTIONS);
     var n_trials = bws_blocks.length + ab_blocks.length;
-    var slots = jsPsych.randomization.shuffle(Array.from({ length: n_trials }, function(_, k) { return k; }))
-        .slice(0, Math.min(questions.length, n_trials));
+    // spread out: the trials are cut into as many equal parts as there are checks, and each check
+    // goes before a random trial of its part (never before the very first trial)
+    var n_checks = Math.min(questions.length, n_trials);
+    var slots = Array.from({ length: n_checks }, function(_, q) {
+        var first = Math.max(1, Math.floor(q * n_trials / n_checks)), last = Math.floor((q + 1) * n_trials / n_checks) - 1;
+        return first + Math.floor(Math.random() * Math.max(1, last - first + 1));
+    });
     var attentionBlock = function(q, k) {
         return {
             type: jsPsychSurveyMultiChoice,
@@ -548,10 +558,10 @@ function getJson(url) {
     });
 }
 
-Promise.all([getJson('design.json'), getJson('session')])
+Promise.all([getJson('design.json'), getJson('session' + (debug ? '?debug=true' : ''))])
     .then(function(loaded) {
         session_token = loaded[1].token;
-        jsPsych.run(buildTimeline(loaded[0]));
+        jsPsych.run(buildTimeline(loaded[0], loaded[1].plan));
     })
     .catch(function(err) {
         document.body.innerHTML = '<p>The study could not be loaded. Please reload the page.</p>';

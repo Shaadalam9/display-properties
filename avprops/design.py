@@ -145,8 +145,9 @@ LEVELS = ("low", "high", "none", "baseline")  # level codes in the participant p
 
 def build_plans(config: dict[str, Any], design: dict[str, Any], rng: np.random.Generator) -> list[dict[str, Any]]:
     """The participant plans: every random assignment of a session, made once here, so the
-    experiment and simulate.py use the same ones (review by Mark Colley). Each participant
-    gets one plan (picked from their code); the plan is logged with their data.
+    experiment and simulate.py use the same ones (review by Mark Colley). The server hands the
+    plans out in turn (plan 0, 1, 2, ...), so every consecutive run of participants is balanced;
+    the plan is logged with their data.
 
     A plan is ``{"bws_version": v, "pairs": [...], "comprehension": [...]}``, compact because
     every participant downloads all of them:
@@ -156,52 +157,119 @@ def build_plans(config: dict[str, Any], design: dict[str, Any], rng: np.random.G
       variant -1 when the property has none, catch 0/1; property index -1 is the display vs
       no display pair (levels "none"/"baseline");
     * comprehension = [property index, level, variant index], one per design["comprehension"]
-      entry, in that order.
+      entry, in that order (the experiment shows them in random order).
 
-    The pairs: ab.tunable_per_participant tunable properties, each in ab.scenes_per_property
-    different scenes, and ab.categorical_per_participant categorical ones in one scene; the low
-    and high level on random sides; one palette variant per property for all its scenes;
-    ab.catch_pairs pairs of one clip on both sides; the display vs no display pair; in random
-    order with no property's two pairs one after the other."""
+    Balanced across plans, as a counterbalanced design is (not left to independent draws):
+
+    * the BWS versions in blocks: every run of as many plans as there are versions uses each
+      version once, in random order;
+    * which properties a participant compares, the scenes each is compared in, the palette
+      variant, the catch pairs' property, scene and level, the no-display pair's scene and the
+      comprehension clips' property and level: each time the least used so far, ties at random;
+    * sides: within a participant, a tunable property is high on A in one scene and high on B in
+      the other, and about half of the single pairs (categorical, display vs no display) have
+      it on A, given to the properties that had it least often; so half of each participant's
+      pairs have the high level (or the display) on A, and each property is on A about half
+      the time across participants.
+
+    Order within a plan: random, with no property's two pairs one after the other, the catch
+    pairs not among the first two and not next to each other, and no scene twice in a row
+    (dropped, for that plan only, when its scenes make it impossible)."""
     props = design["properties"]
     index = {p["id"]: k for k, p in enumerate(props)}
     scene_index = {s["id"]: k for k, s in enumerate(design["scenes"])}
     ab = design["ab"]
     tunable = [p["id"] for p in props if p.get("type") != "categorical"]
     categorical = [p["id"] for p in props if p.get("type") == "categorical"]
+    n_versions = len(design["bws"]["versions"])
+    used: dict[Any, int] = {}
 
-    def variant(prop: str) -> int:
+    def least_used(options: list, key, k: int = 1) -> list:
+        """k options (distinct) that were used least so far under ``key``, ties at random."""
+        ranked = sorted(rng.permutation(len(options)).tolist(), key=lambda i: used.get((key, _hashable(options[i])), 0))
+        picked = [options[i] for i in ranked[:k]]
+        for o in picked:
+            used[(key, _hashable(o))] = used.get((key, _hashable(o)), 0) + 1
+        return picked
+
+    def variant(prop: str, key: str = "variant") -> int:
         variants = props[index[prop]].get("variants")
-        return int(rng.integers(len(variants))) if variants else -1
+        return least_used(list(range(len(variants))), (key, prop))[0] if variants else -1
 
+    def good_order(order: list, level: int) -> bool:
+        """level 2: all rules; 1: a scene may repeat; 0: only a property's pairs kept apart."""
+        real = lambda p: p[0] >= 0 and not p[5]  # noqa: E731
+        if any(real(a) and real(b) and a[0] == b[0] for a, b in zip(order, order[1:])):
+            return False
+        catch = [k for k, p in enumerate(order) if p[5]]
+        if level >= 1 and not (all(k >= 2 for k in catch) and not any(b - a == 1 for a, b in zip(catch, catch[1:]))):
+            return False
+        return level < 2 or not any(a[1] == b[1] for a, b in zip(order, order[1:]))
+
+    version_queue: list[int] = []
     plans = []
     for _ in range(int(config.get("participant_plans", 500))):
+        if not version_queue:
+            version_queue = rng.permutation(n_versions).tolist()
         pairs = []
-        compared = [(str(p), ab["scenes_per_property"]) for p in rng.permutation(tunable)[:ab["tunable_per_participant"]]] + \
-                   [(str(p), 1) for p in rng.permutation(categorical)[:ab["categorical_per_participant"]]]
+        compared = [(p, ab["scenes_per_property"]) for p in least_used(tunable, "tunable", ab["tunable_per_participant"])] + \
+                   [(p, 1) for p in least_used(categorical, "categorical", ab["categorical_per_participant"])]
         for prop, n_scenes in compared:
             v = variant(prop)
-            for scene in rng.permutation(ab["scenes"][prop])[:n_scenes]:
-                a_high = int(rng.random() < 0.5)
-                pairs.append([index[prop], scene_index[str(scene)], a_high, 1 - a_high, v, 0])
+            scenes = least_used(ab["scenes"][prop], ("scene", prop), n_scenes)
+            if n_scenes > 1:
+                sides = [k % 2 for k in range(n_scenes)]  # high on A in half of the property's scenes
+                sides = [sides[i] for i in rng.permutation(n_scenes)]
+            else:
+                sides = [None]  # set below, with the participant's other single pairs
+            for scene, a_high in zip(scenes, sides):
+                pairs.append([index[prop], scene_index[scene], a_high, None if a_high is None else 1 - a_high, v, 0])
         for _ in range(ab["catch_pairs"]):
-            prop = str(rng.choice([p["id"] for p in props]))
-            level = int(rng.random() < 0.5)
-            pairs.append([index[prop], scene_index[str(rng.choice(ab["scenes"][prop]))], level, level, variant(prop), 1])
+            prop = least_used([p["id"] for p in props], "catch")[0]
+            scene = least_used(ab["scenes"][prop], ("catch_scene", prop))[0]
+            level = least_used([0, 1], ("catch_level", prop))[0]
+            pairs.append([index[prop], scene_index[scene], level, level, variant(prop, "catch_variant"), 1])
         if ab["no_display"]:
-            a_none = rng.random() < 0.5
-            pairs.append([-1, int(rng.integers(len(design["scenes"]))), 2 if a_none else 3, 3 if a_none else 2, -1, 0])
-        for _ in range(200):
-            order = [pairs[k] for k in rng.permutation(len(pairs))]
-            if not any(a[0] == b[0] >= 0 and not a[5] and not b[5] for a, b in zip(order, order[1:])):
+            scene = least_used([s["id"] for s in design["scenes"]], "no_display")[0]
+            pairs.append([-1, scene_index[scene], None, None, -1, 0])
+        # the single pairs (categorical properties, display vs no display): about half with the
+        # high level (or the display) on A, so the participant's pairs are balanced too; which of
+        # them get A goes to the properties that had it least often across participants
+        single = [p for p in pairs if p[2] is None]
+        if single:
+            n_a = least_used([len(single) // 2, (len(single) + 1) // 2], ("single_on_a", len(single)))[0]
+            share = lambda i: used.get(("side", single[i][0]), 0) / max(used.get(("side_n", single[i][0]), 0), 1)  # noqa: E731
+            ranked = sorted(rng.permutation(len(single)).tolist(), key=share)
+            for rank, i in enumerate(ranked):
+                on_a = rank < n_a
+                used[("side", single[i][0])] = used.get(("side", single[i][0]), 0) + on_a
+                used[("side_n", single[i][0])] = used.get(("side_n", single[i][0]), 0) + 1
+                if single[i][0] < 0:
+                    single[i][2], single[i][3] = (3, 2) if on_a else (2, 3)
+                else:
+                    single[i][2], single[i][3] = int(on_a), 1 - int(on_a)
+        order = None
+        for level in (2, 1, 0):
+            for _ in range(2000):
+                candidate = [pairs[k] for k in rng.permutation(len(pairs))]
+                if good_order(candidate, level):
+                    order = candidate
+                    break
+            if order:
                 break
+        if order is None:
+            raise ValueError("no order of the A/B pairs keeps a property's two pairs apart")
         comprehension = []
         for c in design["comprehension"]:
-            prop = str(rng.choice(c["properties"]))
-            comprehension.append([index[prop], int(rng.random() < 0.5), variant(prop)])
-        plans.append({"bws_version": int(rng.integers(len(design["bws"]["versions"]))), "pairs": order,
-                      "comprehension": comprehension})
+            prop = least_used(c["properties"], ("comprehension", c["scene"]))[0]
+            level = least_used([0, 1], ("comprehension_level", c["scene"]))[0]
+            comprehension.append([index[prop], level, variant(prop, "comprehension_variant")])
+        plans.append({"bws_version": int(version_queue.pop(0)), "pairs": order, "comprehension": comprehension})
     return plans
+
+
+def _hashable(value: Any) -> Any:
+    return value.item() if isinstance(value, np.generic) else value
 
 
 def expand_plan(plan: dict[str, Any], design: dict[str, Any]) -> dict[str, Any]:

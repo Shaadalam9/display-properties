@@ -117,7 +117,7 @@ range people's preferences lie.
 Four of these are the parameters of the follow-up preference study (highlight strength, path visibility, background
 dimming and colour palette), with the same ranges and defaults, so that study's choice of parameters can be checked
 against what participants rank here. The palette has three alternatives to the standard one; each participant sees
-one of them, at random.
+one of them (spread evenly across participants).
 
 Not in the study: distance labels, a status panel and the panel position are kept as reserves; placement, audio,
 on-demand display, explanation timing, path shape and text size are fixed or excluded, with the reason in
@@ -223,7 +223,10 @@ Data is saved after every trial, so the answers of participants who stop early a
 session (the BWS version out of 50 balanced versions, which properties are compared in which scenes, the sides, the
 palette alternative, the catch pairs, the order of the pairs and the comprehension clips) comes from one of 500
 **participant plans** made in Python (`avprops/design.py`, `build_plans`) and stored in `public/design.json`. The
-experiment picks a plan from the participant's code and logs it in its first row; `simulate.py` uses the same plans, so
+server hands the plans out in turn (a counter in the database), so every run of consecutive participants is
+counterbalanced: each block of 50 plans uses every BWS version once, properties, scenes, palette alternatives and sides
+are spread evenly, a property is high on A in one of its scenes and on B in the other, and catch pairs never come first
+or back to back. The experiment logs the plan in its first row; `simulate.py` uses the same plans, so
 the experiment and the simulation cannot drift apart, and `plan_mismatches` checks a session against the plan it
 logged.
 

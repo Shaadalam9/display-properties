@@ -41,9 +41,14 @@ driving and asked to imagine the car drives itself.
   highlight style, colour by road-user type, other road users' paths, when the display is shown, colour palette
   (three alternatives to the standard palette; each participant sees one at random).
 
-**Assignment.** 500 participant plans are generated in advance (`design.json`, seed 2026) and each participant gets
-one at random. A plan fixes the BWS version, the order and content of all A/B pairs and the comprehension clips. The
-logged plan is checked against what the participant actually saw (`plan_mismatches`).
+**Assignment.** 500 participant plans are generated in advance (`design.json`, seed 2026) and handed out in turn by
+the server (participant 1 gets plan 0, the next plan 1, and so on), so every run of consecutive participants is
+counterbalanced: each block of 50 plans uses each of the 50 BWS versions once, and the properties a participant
+compares, the scenes each is compared in, the palette alternative, the catch pairs and the comprehension clips' property
+and level are each spread evenly over the plans (least used so far, ties at random). A plan fixes the BWS version, the
+order and content of all A/B pairs and the comprehension clips. The logged plan is checked against what the participant
+actually saw (`plan_mismatches`). The task order is fixed (comprehension, baseline, BWS, then A/B pairs): the BWS
+ranking comes before the A/B pairs so that it is not swayed by the few properties a participant happens to compare.
 
 **Procedure.**
 
@@ -52,7 +57,7 @@ logged plan is checked against what the participant actually saw (`plan_mismatch
    say"; without it colour vision counts as unknown).
 2. Questionnaires: propensity to trust automation (Körber, 2019) and affinity for technology interaction (ATI;
    Franke et al., 2019).
-3. Comprehension: short clips that stop before the event; "what will the car do next?" (properties marked
+3. Comprehension: short clips, in random order, that stop before the event; "what will the car do next?" (properties marked
    `in_comprehension: false`, explanation detail and manoeuvre cue, are left out because they name the answer).
 4. A baseline clip with the default display and an open question: what would you want this display to show, or show
    differently? (required; analysed qualitatively, not part of the rule)
@@ -63,8 +68,12 @@ logged plan is checked against what the participant actually saw (`plan_mismatch
    6 tunable properties × 2 different scenes, 2 categorical properties × 1 scene, 2 catch pairs (identical clips), and
    1 pair of display vs no display. Per pair: "Did you notice a difference?" (yes/no), preference on a 5-point scale
    (A clearly, A slightly, no preference, B slightly, B clearly), and how much the difference matters (7 points). Sides
-   are counterbalanced; two pairs of the same property never follow each other.
-7. Six attention checks, each placed before a randomly chosen BWS trial or A/B pair; the study ends after 3 wrong
+   are counterbalanced: a tunable property has its high level on A in one scene and on B in the other, and half of a
+   participant's pairs have the high level (or the display) on A. The pairs are in random order, with two pairs of the
+   same property, or of the same scene, never one after the other, and the catch pairs not among the first two and not
+   next to each other.
+7. Six attention checks, spread out: the BWS trials and A/B pairs are cut into six equal parts and one check goes
+   before a random trial of each part; the study ends after 3 wrong
    answers (partial payment).
 8. Optional final comment.
 

@@ -141,7 +141,7 @@ def rows_to_records(rows: list[dict], attention_max_wrong: int) -> list[dict[str
                     {item: int(index) + 1 for item, index in response.items()})
             elif task == "comprehension":
                 record["comprehension"].append({key: t.get(key) for key in (
-                    "scene", "property", "level", "high_variant", "answer", "correct")}
+                    "index", "scene", "property", "level", "high_variant", "answer", "correct")}
                     | {"rt_ms": _rt(t), "hidden": bool(t.get("hidden"))})
             elif task == "attention":
                 attention.append(bool(t.get("correct")))
@@ -175,7 +175,7 @@ def plan_mismatches(record: dict[str, Any], design: dict[str, Any] | None = None
         for key in ("property", "scene", "a_level", "b_level", "high_variant", "catch"):
             if done.get(key) != planned.get(key) and not (key == "catch" and not done.get(key) and not planned.get(key)):
                 problems.append(f"pair {k}: {key} {done.get(key)!r}, plan {planned.get(key)!r}")
-    done_c = record.get("comprehension", [])
+    done_c = sorted(record.get("comprehension", []), key=lambda c: c.get("index", 0))  # shown in random order
     if len(done_c) != len(logged.get("comprehension", [])):
         problems.append(f"{len(done_c)} comprehension clips, plan has {len(logged.get('comprehension', []))}")
     for k, (done, planned) in enumerate(zip(done_c, logged.get("comprehension", []))):

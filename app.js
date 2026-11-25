@@ -129,8 +129,37 @@ app.get('/experiment', page('experiment.html'));
 app.get('/finish', page('finish.html'));
 app.get('/finish_fail', page('finish_fail.html'));
 
-app.get('/session', (request, response) => {
-    response.set('Cache-Control', 'no-store').json({ token: newToken() });
+// --- PLAN ASSIGNMENT
+// The participant plans (public/design.json) are handed out in turn, 0, 1, 2, ..., so every run
+// of consecutive participants is balanced (BWS versions, properties, scenes, sides), as in a
+// counterbalanced design; drawing a plan at random in each browser would not be. The counter
+// lives in the database (collection "counters"), or next to the local data file. Debug sessions
+// get a random plan and leave the counter alone.
+const N_PLANS = JSON.parse(fs.readFileSync(path.join(PUBLIC, 'design.json'), 'utf8')).plans.length;
+const COUNTER_FILE = path.join(path.dirname(LOCAL_FILE), 'plan.counter');
+
+async function nextPlan() {
+    if (Entry) {
+        const counter = await mongoose.connection.collection('counters').findOneAndUpdate(
+            { _id: 'plan' }, { $inc: { n: 1 } }, { upsert: true, returnDocument: 'after' });
+        const doc = counter && counter.value !== undefined ? counter.value : counter;
+        return (doc.n - 1) % N_PLANS;
+    }
+    const n = fs.existsSync(COUNTER_FILE) ? Number(fs.readFileSync(COUNTER_FILE, 'utf8')) || 0 : 0;
+    fs.writeFileSync(COUNTER_FILE, String(n + 1));
+    return n % N_PLANS;
+}
+
+app.get('/session', async (request, response) => {
+    let plan = null;
+    if (!/^true$/i.test(String(request.query.debug || ''))) {
+        try {
+            plan = await nextPlan();
+        } catch (err) {
+            console.error('could not assign a plan, the page draws one', err);
+        }
+    }
+    response.set('Cache-Control', 'no-store').json({ token: newToken(), plan: plan });
 });
 
 app.post('/experiment-data', async (request, response) => {

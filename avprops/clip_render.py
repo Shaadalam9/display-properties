@@ -242,6 +242,30 @@ def path_on_ground(camera: Camera, ribbon: dict[str, Any] | None, length_m: floa
     return ground[keep] if keep.sum() >= 2 else None
 
 
+def _extend_path(ground: np.ndarray, length_m: float, step_m: float = 1.0, min_reach_m: float = 8.0,
+                 max_angle_deg: float = 12.0) -> tuple[np.ndarray, np.ndarray]:
+    """The path continued straight on to ``length_m`` past where the lane detection stops.
+    The detection often reaches only a few metres ahead (no visible lane lines, traffic in
+    front), which made the planned path short or blink. It continues along the heading of
+    its last 5 m when it saw at least ``min_reach_m`` of road (that heading clamped to
+    +-``max_angle_deg``), else straight ahead. Returns the points and a weight per point:
+    1 where detected, 0.05 where continued, so detected neighbours win in the smoothing."""
+    arc = _arc(ground)
+    weight = np.ones(len(ground))
+    if arc[-1] >= length_m:
+        return ground, weight
+    heading = np.array([0.0, 1.0])
+    if arc[-1] >= min_reach_m:
+        back = ground[np.searchsorted(arc, arc[-1] - 5.0)]
+        v = ground[-1] - back
+        if np.linalg.norm(v) > 1e-6 and v[1] > 0:
+            angle = np.clip(np.arctan2(v[0], v[1]), -np.radians(max_angle_deg), np.radians(max_angle_deg))
+            heading = np.array([np.sin(angle), np.cos(angle)])
+    steps = np.arange(step_m, length_m - arc[-1] + step_m, step_m)
+    extra = ground[-1] + steps[:, None] * heading
+    return np.vstack([ground, extra]), np.concatenate([weight, np.full(len(extra), 0.05)])
+
+
 def _normals(ground: np.ndarray) -> np.ndarray:
     tangent = np.gradient(ground, axis=0)
     tangent /= np.maximum(np.linalg.norm(tangent, axis=1, keepdims=True), 1e-6)
@@ -314,8 +338,47 @@ class ClipRenderer:
         self._confidence = self._confidence_track()
         self._tracks = self._track_positions()
         self._markers = self._marker_tracks()
+        self._paths = self._smoothed_paths()
 
     # --- per-clip tracks
+
+    def _smoothed_paths(self, smooth_s: float = 0.2, max_length_m: float = 80.0) -> list[np.ndarray | None]:
+        """The planned path per frame, smoothed over time. The lane detection behind it
+        wobbles from frame to frame, so a path drawn from each frame alone trembles. Each
+        frame keeps its own distances ahead; the sideways position at each distance is the
+        mean over the frames within +-``smooth_s`` (centred, so it does not lag)."""
+        raw = [path_on_ground(self.camera, f.get("ribbon"), max_length_m) for f in self.geometry.frames]
+        raw = [_extend_path(g, max_length_m) if g is not None else None for g in raw]
+        half = max(1, int(round(smooth_s * self.fps)))
+        out: list[np.ndarray | None] = []
+        for i, item in enumerate(raw):
+            if item is None:
+                out.append(None)
+                continue
+            ground, _ = item
+            d = ground[:, 1]
+            xs, ws = [], []
+            for j in range(max(0, i - half), min(len(raw), i + half + 1)):
+                if raw[j] is None:
+                    continue
+                other, weight = raw[j]
+                order = np.argsort(other[:, 1])
+                xs.append(np.interp(d, other[order, 1], other[order, 0], left=np.nan, right=np.nan))
+                ws.append(np.interp(d, other[order, 1], weight[order], left=0.0, right=0.0))
+            xs, ws = np.vstack(xs), np.vstack(ws)
+            ws = np.where(np.isnan(xs), 0.0, ws)
+            total = ws.sum(axis=0)
+            x = np.where(total > 0, (np.nan_to_num(xs) * ws).sum(axis=0) / np.maximum(total, 1e-9), np.nan)
+            out.append(np.column_stack([np.where(np.isnan(x), ground[:, 0], x), d]))
+        return out
+
+    def _path(self, index: int, length_m: float) -> np.ndarray | None:
+        """The smoothed path of a frame, cut at length_m of arc."""
+        ground = self._paths[index]
+        if ground is None:
+            return None
+        keep = _arc(ground) <= length_m
+        return ground[keep] if keep.sum() >= 2 else None
 
     def _marker_tracks(self, smooth_s: float = 0.15, gap_s: float = 0.3) -> dict[int, list[dict]]:
         """Pedestrian markers per frame, smoothed along each track. The detector's box jitters
@@ -447,7 +510,7 @@ class ClipRenderer:
     def _draw_path(self, ov: Overlay, frame: dict, style: Style, pal: dict, index: int, occlusion) -> None:
         if style.trajectory_alpha <= 0:
             return
-        ground = path_on_ground(self.camera, frame.get("ribbon"), style.path_length_m)
+        ground = self._path(index, style.path_length_m)
         if ground is None:
             return
         shape = (self.height, self.width)
@@ -563,12 +626,12 @@ class ClipRenderer:
 
             ov.paint(_mask((self.height, self.width), draw), (255, 255, 255), 0.85)
 
-    def _dim_mask(self, frame: dict, style: Style) -> np.ndarray:
+    def _dim_mask(self, frame: dict, style: Style, index: int = 0) -> np.ndarray:
         keep = np.zeros((self.height, self.width), np.uint8)
         for det in self._shown(frame, style):
             x0, y0, x1, y1 = (int(v) for v in det["box"])
             cv2.rectangle(keep, (x0 - 6, y0 - 6), (x1 + 6, y1 + 6), 255, -1)
-        ground = path_on_ground(self.camera, frame.get("ribbon"), style.path_length_m) if style.trajectory_alpha > 0 else None
+        ground = self._path(index, style.path_length_m) if style.trajectory_alpha > 0 else None
         if ground is not None:
             n = _normals(ground)
             w = style.path_half_width_m + 0.5
@@ -656,7 +719,7 @@ class ClipRenderer:
         pal = PALETTES[style.palette_id]
         out = image_bgr.astype(np.float32)
         if style.background_dim_alpha > 0:
-            out *= 1 - (self._dim_mask(frame, style) * style.background_dim_alpha * strength)[..., None]
+            out *= 1 - (self._dim_mask(frame, style, index) * style.background_dim_alpha * strength)[..., None]
         ov = Overlay(self.width, self.height)
         self._draw_path(ov, frame, style, pal, index, occlusion)
         shown = self._draw_highlights(ov, frame, style, pal, index)

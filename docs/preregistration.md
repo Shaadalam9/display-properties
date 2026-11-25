@@ -29,7 +29,7 @@ Within-participants online experiment (jsPsych), about 30 minutes, on a computer
 phones and tablets cannot take part).
 
 **Stimuli.** 14-second clips cut from public dashcam footage (CROWD dataset), with an explanation display rendered
-on top, in one calm and one risky scene per city (19 scenes, 9 countries). For each property and scene there is a
+on top, in one calm and one risky scene per city (18 scenes, 9 countries; Mexico City has only a calm scene). For each property and scene there is a
 low and a high clip, identical except for that one property. Participants are told the footage was filmed by people
 driving and asked to imagine the car drives itself.
 

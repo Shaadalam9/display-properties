@@ -100,3 +100,37 @@ def test_pedestrian_markers_are_smoothed_along_the_track():
     assert np.abs(np.diff(smooth, 2)).mean() < 0.3 * np.abs(np.diff(raw, 2)).mean(), "less jitter"
     middle = np.array([track[i] - (105 + i) for i in range(10, 50)])
     assert abs(middle.mean()) < 1.0, "the marker does not lag behind the walking pedestrian"
+
+
+def test_planned_path_is_smoothed_over_time():
+    """A path whose lane detection wobbles from frame to frame is drawn steadily."""
+    geometry = synthetic_geometry()
+    rng = np.random.default_rng(1)
+    for f in geometry.frames:
+        centre = np.asarray(f["ribbon"]["centre"], float)
+        centre[:, 0] += rng.normal(0, 4)  # the whole detected path shifts sideways by about 4 px
+        f["ribbon"] = dict(f["ribbon"], centre=centre.tolist())
+    renderer = ClipRenderer(geometry, SCENE)
+
+    def at_10m(ground):
+        order = np.argsort(ground[:, 1])
+        return renderer.camera.to_image(np.array([[np.interp(10.0, ground[order, 1], ground[order, 0]), 10.0]]))[0, 0]
+
+    from avprops.clip_render import path_on_ground
+    raw = np.array([at_10m(path_on_ground(renderer.camera, f["ribbon"], 40)) for f in geometry.frames])
+    smooth = np.array([at_10m(renderer._path(i, 40)) for i in range(N)])
+    assert np.abs(np.diff(smooth, 2)).mean() < 0.3 * np.abs(np.diff(raw, 2)).mean()
+
+
+def test_planned_path_reaches_full_length_when_detection_is_short():
+    """A lane detection that sees only a few metres ahead still gives a path of the full length."""
+    from avprops.clip_render import _arc, path_on_ground
+    geometry = synthetic_geometry()
+    renderer = ClipRenderer(geometry, SCENE)
+    for f in geometry.frames:
+        short = path_on_ground(renderer.camera, f["ribbon"], 4.0)  # what a short detection sees
+        f["ribbon"] = dict(f["ribbon"], centre=renderer.camera.to_image(short).tolist(), ordered=True)
+    renderer = ClipRenderer(geometry, SCENE)
+    for i in range(N):
+        assert _arc(path_on_ground(renderer.camera, geometry.frames[i]["ribbon"], 80))[-1] < 5
+        assert _arc(renderer._path(i, 35.0))[-1] > 33

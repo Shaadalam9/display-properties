@@ -8,7 +8,7 @@ optimisation tunes only those.
 
 <p align="center">
   <img src="docs/figures/display.gif" width="640" alt="The default display in Valencia: the planned path on the road and markers above the pedestrians the car reacts to">
-  <br><em>The default display in one of the 19 scenes: the car's planned path, and markers above the pedestrians it
+  <br><em>The default display in one of the 18 scenes: the car's planned path, and markers above the pedestrians it
   reacts to.</em>
 </p>
 
@@ -125,12 +125,12 @@ on-demand display, explanation timing, path shape and text size are fixed or exc
 
 ## The scenes
 
-Nineteen 14-second scenes: one calm and one risky stretch from each of eight cities on four continents, plus three
-earlier scenes from the USA and Egypt. Each scene records its country (to compare clips from a participant's own country with
+Eighteen 14-second scenes: one calm and one risky stretch from each of eight cities on four continents (Mexico City
+calm only: its risky clip has a cut in the footage and was dropped), plus three earlier scenes from the USA and Egypt. Each scene records its country (to compare clips from a participant's own country with
 clips from elsewhere) and its criticality (to compare calm and risky situations).
 
 <p align="center">
-  <img src="docs/figures/scenes.jpg" alt="A frame of each of the 19 scenes during its event, with the default display">
+  <img src="docs/figures/scenes.jpg" alt="A frame of each of the 18 scenes during its event, with the default display">
 </p>
 
 | Scene | City | Country | Risk | Source (start) |
@@ -145,7 +145,6 @@ clips from elsewhere) and its criticality (to compare calm and risky situations)
 | `chicago_calm` | Chicago | USA | calm | [XzwI2rGmf04 at 11:56](https://www.youtube.com/watch?v=XzwI2rGmf04&t=716s) |
 | `chicago_risky` | Chicago | USA | risky | [XzwI2rGmf04 at 59:19](https://www.youtube.com/watch?v=XzwI2rGmf04&t=3559s) |
 | `mexico_city_calm` | Mexico City | Mexico | calm | [MpA3FHZ3yZc at 39:34](https://www.youtube.com/watch?v=MpA3FHZ3yZc&t=2374s) |
-| `mexico_city_risky` | Mexico City | Mexico | risky | [MpA3FHZ3yZc at 2:44](https://www.youtube.com/watch?v=MpA3FHZ3yZc&t=164s) |
 | `jaipur_calm` | Jaipur | India | calm | [jwZV8i60Sbs at 14:14](https://www.youtube.com/watch?v=jwZV8i60Sbs&t=854s) |
 | `jaipur_risky` | Jaipur | India | risky | [jwZV8i60Sbs at 1:34](https://www.youtube.com/watch?v=jwZV8i60Sbs&t=94s) |
 | `hanoi_calm` | Hanoi | Vietnam | calm | [AKaJkDqrOjU at 6:08](https://www.youtube.com/watch?v=AKaJkDqrOjU&t=368s) |
@@ -268,7 +267,7 @@ uv run python make_design.py                             # uses the check to pic
 uv run python make_figures.py                            # the figures in this README
 ```
 
-**The rendered files.** `public/stimuli/` (not in git) has 20 folders: one per scene (19) and `previews/`.
+**The rendered files.** `public/stimuli/` (not in git) has 19 folders: one per scene (18) and `previews/`.
 
 ```
 public/stimuli/

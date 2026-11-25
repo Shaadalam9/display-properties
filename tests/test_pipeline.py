@@ -290,11 +290,12 @@ def test_design_versions_are_not_pooled_silently(config, design):
 
 def test_other_study_is_left_out(config, design):
     documents, _ = simulate(design, n=2, seed=15)
+    other = config["study_id"] + "_other"
     for row in documents[0]["data"]:
-        row["study_id"] = "av_display_properties_pilot"
+        row["study_id"] = other
     reasons = analyse(records_from(documents, config), load_properties(config), config)["exclusions"] \
         .set_index("pid")["reasons"]
-    assert "other study (av_display_properties_pilot)" in reasons["sim0000"]
+    assert f"other study ({other})" in reasons["sim0000"]
     assert "other study" not in reasons["sim0001"]
 
 

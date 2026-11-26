@@ -63,4 +63,5 @@ git add -A
 git add -f public/stimuli
 git -c user.name="deploy" -c user.email="deploy@localhost" commit -q -m "Deploy $(git -C "$ROOT" rev-parse --short HEAD) with stimuli"
 git push --force "https://git.heroku.com/$APP.git" main
-echo "Deployed to https://$APP.herokuapp.com (open with ?debug=true to try it)"
+URL=$(heroku apps:info -a "$APP" --json | python3 -c "import json,sys; print(json.load(sys.stdin)['app']['web_url'])")
+echo "Deployed to ${URL} (open with ?debug=true to try it)"

@@ -1,5 +1,5 @@
-// Participant-facing text. Fill in the [placeholders] (contact details, withdrawal date) before
-// the pilot.
+// Participant-facing text. Data removal deadline: 31 March 2027.
+// Consent wording follows Mark Colley's UCL approval (UCLIC, project ID 1165).
 // Strings may contain HTML.
 var STUDY_TEXT = {
     welcome:
@@ -13,8 +13,11 @@ var STUDY_TEXT = {
     consent:
         '<h1>Information and consent</h1>' +
         '<div class="info-sheet">' +
-        '<p><strong>Who we are.</strong> This study is run by researchers at Eindhoven University of Technology ' +
-        '(TU/e), the Netherlands.</p>' +
+        '<p><strong>Who we are.</strong> This study is run by Dr Mark Colley and colleagues at the UCL Interaction ' +
+        'Centre, University College London (UCL), United Kingdom. It is part of the project "User research, design, ' +
+        'evaluation and data collection of and for user interfaces for enhancing mobility user interfaces". ' +
+        'It was approved by the UCL Interaction Centre (UCLIC) Departmental Ethics Committee, chair Prof. Nadia ' +
+        'Berthouze; project ID number 1165.</p>' +
         '<p><strong>Purpose.</strong> We want to find out which parts of a display in a future self-driving car ' +
         'would help passengers understand what the car does and why.</p>' +
         '<p><strong>What you will do.</strong> Answer a few questions about yourself, watch short videos of traffic ' +
@@ -32,15 +35,24 @@ var STUDY_TEXT = {
         'whether people with a colour vision deficiency see the colours of the display differently. We do not ask for your name, email address or exact location. Your IP address is stored ' +
         'with your answers only to detect people who take part more than once; it is then replaced by a ' +
         'placeholder and never published. During the study your answers are stored in an online database ' +
-        '(MongoDB Atlas) behind the study website (Heroku); afterwards they are moved to storage of Eindhoven ' +
-        'University of Technology and deleted from the database. An anonymised version of the data ' +
+        '(MongoDB Atlas) behind the study website (Heroku), run by companies in the USA; afterwards they are moved ' +
+        'to UCL storage and deleted from the database. An anonymised version of the data ' +
         '(without codes or IP addresses, with age in ranges) will be published in an open research repository ' +
-        'and used in scientific publications.</p>' +
+        'and used in scientific publications, and will be archived at UCL for 20 years in line with UCL guidelines. ' +
+        'Please do not type your name or other personal details into any answer.</p>' +
+        '<p><strong>Data protection.</strong> UCL is the controller of your data. Under data protection law (GDPR ' +
+        'and the UK Data Protection Act 2018), the lawful basis for using your data is "public task", and for ' +
+        'your colour vision answer "research purposes". Your data may be reviewed by responsible people at UCL ' +
+        '(the study sponsor) for monitoring and audit. More about how UCL uses participant data: ' +
+        '<a href="https://www.ucl.ac.uk/legal-services/privacy/ucl-general-privacy-notice-participants-and-researchers-health-and-care-research-studies" ' +
+        'target="_blank" rel="noopener">UCL general privacy notice</a>.</p>' +
         '<p><strong>Voluntary.</strong> Taking part is voluntary. You can stop at any time by closing this page, ' +
         'without giving a reason. To have your data removed afterwards, send your completion code to ' +
-        '[contact email] before [date]; after that, the data can no longer be linked to you.</p>' +
-        '<p><strong>Questions or complaints.</strong> [contact email]; about how your data are handled: the TU/e ' +
-        'data protection officer, [privacy contact].</p>' +
+        'm.colley@ucl.ac.uk before 31 March 2027; after that, the data can no longer be linked to you.</p>' +
+        '<p><strong>Questions or complaints.</strong> Dr Mark Colley, UCL Interaction Centre, 66-72 Gower Street, ' +
+        'London WC1E 6EA, United Kingdom, m.colley@ucl.ac.uk. If your concern is not resolved, contact the UCL ' +
+        'Ethics Committee at ethics@ucl.ac.uk. About how your data are handled or your rights: the UCL Data ' +
+        'Protection Officer, data-protection@ucl.ac.uk.</p>' +
         '</div>' +
         '<p>By continuing you confirm that:</p>' +
         '<ul class="consent-list">' +

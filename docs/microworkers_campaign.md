@@ -29,7 +29,7 @@ Watch short traffic videos and tell us which display features matter to you (abo
 
 ## What is expected from the worker
 
-> This is a study by researchers at Eindhoven University of Technology (the Netherlands) about displays in future
+> This is a study by researchers at University College London (UK) about displays in future
 > self-driving cars. You will watch short videos of real traffic with a display drawn on top, compare pairs of
 > videos and answer questions. It takes about 30 minutes.
 >
